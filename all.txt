@@ -1,0 +1,2529 @@
+//www.elegoo.com
+//2016.12.08
+#include "SR04.h"
+#define TRIG_PIN 12
+#define ECHO_PIN 11
+SR04 sr04 = SR04(ECHO_PIN,TRIG_PIN);
+long a;
+
+void setup() {
+   Serial.begin(9600);
+   delay(1000);
+}
+
+void loop() {
+   a=sr04.Distance();
+   Serial.print(a);
+   Serial.println("cm");
+   delay(1000);
+}
+//www.elegoo.com
+//2016.12.9
+
+/* @file CustomKeypad.pde
+|| @version 1.0
+|| @author Alexander Brevig
+|| @contact alexanderbrevig@gmail.com
+||
+|| @description
+|| | Demonstrates changing the keypad size and key values.
+|| #
+*/
+#include <Keypad.h>
+
+const byte ROWS = 4; //four rows
+const byte COLS = 4; //four columns
+//define the cymbols on the buttons of the keypads
+char hexaKeys[ROWS][COLS] = {
+  {'1','2','3','A'},
+  {'4','5','6','B'},
+  {'7','8','9','C'},
+  {'*','0','#','D'}
+};
+byte rowPins[ROWS] = {9, 8, 7, 6}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {5, 4, 3, 2}; //connect to the column pinouts of the keypad
+
+//initialize an instance of class NewKeypad
+Keypad customKeypad = Keypad( makeKeymap(hexaKeys), rowPins, colPins, ROWS, COLS); 
+
+void setup(){
+  Serial.begin(9600);
+}
+  
+void loop(){
+  char customKey = customKeypad.getKey();
+  
+  if (customKey){
+    Serial.println(customKey);
+  }
+}
+//www.elegoo.com
+//2018.10.25
+
+
+#include <dht_nonblocking.h>
+#define DHT_SENSOR_TYPE DHT_TYPE_11
+
+static const int DHT_SENSOR_PIN = 2;
+DHT_nonblocking dht_sensor( DHT_SENSOR_PIN, DHT_SENSOR_TYPE );
+
+
+
+/*
+ * Initialize the serial port.
+ */
+void setup( )
+{
+  Serial.begin( 9600);
+}
+
+
+
+/*
+ * Poll for a measurement, keeping the state machine alive.  Returns
+ * true if a measurement is available.
+ */
+static bool measure_environment( float *temperature, float *humidity )
+{
+  static unsigned long measurement_timestamp = millis( );
+
+  /* Measure once every four seconds. */
+  if( millis( ) - measurement_timestamp > 3000ul )
+  {
+    if( dht_sensor.measure( temperature, humidity ) == true )
+    {
+      measurement_timestamp = millis( );
+      return( true );
+    }
+  }
+
+  return( false );
+}
+
+
+
+/*
+ * Main program loop.
+ */
+void loop( )
+{
+  float temperature;
+  float humidity;
+
+  /* Measure temperature and humidity.  If the functions returns
+     true, then a measurement is available. */
+  if( measure_environment( &temperature, &humidity ) == true )
+  {
+    Serial.print( "T = " );
+    Serial.print( temperature, 1 );
+    Serial.print( " deg. C, H = " );
+    Serial.print( humidity, 1 );
+    Serial.println( "%" );
+  }
+}
+//www.elegoo.com
+//2016.12.09
+
+// Arduino pin numbers
+const int SW_pin = 2; // digital pin connected to switch output
+const int X_pin = 0; // analog pin connected to X output
+const int Y_pin = 1; // analog pin connected to Y output
+
+void setup() {
+  pinMode(SW_pin, INPUT);
+  digitalWrite(SW_pin, HIGH);
+  Serial.begin(9600);
+}
+
+void loop() {
+  Serial.print("Switch:  ");
+  Serial.print(digitalRead(SW_pin));
+  Serial.print("\n");
+  Serial.print("X-axis: ");
+  Serial.print(analogRead(X_pin));
+  Serial.print("\n");
+  Serial.print("Y-axis: ");
+  Serial.println(analogRead(Y_pin));
+  Serial.print("\n\n");
+  delay(500);
+}
+//www.elegoo.com
+//2023.05.05
+
+#include "IRremote.h"
+
+int receiver = 11; // Signal Pin of IR receiver to Arduino Digital Pin 11
+
+/*-----( Declare objects )-----*/
+IRrecv irrecv(receiver);     // create instance of 'irrecv'
+//vairable uses to store the last decodedRawData
+uint32_t last_decodedRawData = 0;
+/*-----( Function )-----*/
+void translateIR() // takes action based on IR code received
+{
+  // Check if it is a repeat IR code 
+  if (irrecv.decodedIRData.flags)
+  {
+    //set the current decodedRawData to the last decodedRawData 
+    irrecv.decodedIRData.decodedRawData = last_decodedRawData;
+    Serial.println("REPEAT!");
+  } else
+  {
+    //output the IR code on the serial monitor
+    Serial.print("IR code:0x");
+    Serial.println(irrecv.decodedIRData.decodedRawData, HEX);
+  }
+  //map the IR code to the remote key
+  switch (irrecv.decodedIRData.decodedRawData)
+  {
+    case 0xBA45FF00: Serial.println("POWER"); break;
+    case 0xB847FF00: Serial.println("FUNC/STOP"); break;
+    case 0xB946FF00: Serial.println("VOL+"); break;
+    case 0xBB44FF00: Serial.println("FAST BACK");    break;
+    case 0xBF40FF00: Serial.println("PAUSE");    break;
+    case 0xBC43FF00: Serial.println("FAST FORWARD");   break;
+    case 0xF807FF00: Serial.println("DOWN");    break;
+    case 0xEA15FF00: Serial.println("VOL-");    break;
+    case 0xF609FF00: Serial.println("UP");    break;
+    case 0xE619FF00: Serial.println("EQ");    break;
+    case 0xF20DFF00: Serial.println("ST/REPT");    break;
+    case 0xE916FF00: Serial.println("0");    break;
+    case 0xF30CFF00: Serial.println("1");    break;
+    case 0xE718FF00: Serial.println("2");    break;
+    case 0xA15EFF00: Serial.println("3");    break;
+    case 0xF708FF00: Serial.println("4");    break;
+    case 0xE31CFF00: Serial.println("5");    break;
+    case 0xA55AFF00: Serial.println("6");    break;
+    case 0xBD42FF00: Serial.println("7");    break;
+    case 0xAD52FF00: Serial.println("8");    break;
+    case 0xB54AFF00: Serial.println("9");    break;
+    default:
+      Serial.println(" other button   ");
+  }// End Case
+  //store the last decodedRawData
+  last_decodedRawData = irrecv.decodedIRData.decodedRawData;
+  delay(500); // Do not get immediate repeat
+} //END translateIR
+
+void setup()   /*----( SETUP: RUNS ONCE )----*/
+{
+  Serial.begin(9600);
+  Serial.println("IR Receiver Button Decode");
+  irrecv.enableIRIn(); // Start the receiver
+
+}/*--(end setup )---*/
+
+
+void loop()   /*----( LOOP: RUNS CONSTANTLY )----*/
+{
+  if (irrecv.decode()) // have we received an IR signal?
+  {
+    translateIR();
+    irrecv.resume(); // receive the next value
+  }
+}/* --(end main loop )-- */
+//www.elegoo.com
+//2016.12.9
+
+//We always have to include the library
+#include "LedControl.h"
+
+/*
+ Now we need a LedControl to work with.
+ ***** These pin numbers will probably not work with your hardware *****
+ pin 12 is connected to the DataIn 
+ pin 11 is connected to LOAD(CS)
+ pin 10 is connected to the CLK 
+ We have only a single MAX72XX.
+ */
+LedControl lc=LedControl(12,10,11,1);
+
+/* we always wait a bit between updates of the display */
+unsigned long delaytime1=500;
+unsigned long delaytime2=50;
+void setup() {
+  /*
+   The MAX72XX is in power-saving mode on startup,
+   we have to do a wakeup call
+   */
+  lc.shutdown(0,false);
+  /* Set the brightness to a medium values */
+  lc.setIntensity(0,8);
+  /* and clear the display */
+  lc.clearDisplay(0);
+}
+
+/*
+ This method will display the characters for the
+ word "Arduino" one after the other on the matrix. 
+ (you need at least 5x7 leds to see the whole chars)
+ */
+void writeArduinoOnMatrix() {
+  /* here is the data for the characters */
+  byte a[5]={B01111110,B10001000,B10001000,B10001000,B01111110};
+  byte r[5]={B00010000,B00100000,B00100000,B00010000,B00111110};
+  byte d[5]={B11111110,B00010010,B00100010,B00100010,B00011100};
+  byte u[5]={B00111110,B00000100,B00000010,B00000010,B00111100};
+  byte i[5]={B00000000,B00000010,B10111110,B00100010,B00000000};
+  byte n[5]={B00011110,B00100000,B00100000,B00010000,B00111110};
+  byte o[5]={B00011100,B00100010,B00100010,B00100010,B00011100};
+
+  /* now display them one by one with a small delay */
+  lc.setRow(0,0,a[0]);
+  lc.setRow(0,1,a[1]);
+  lc.setRow(0,2,a[2]);
+  lc.setRow(0,3,a[3]);
+  lc.setRow(0,4,a[4]);
+  delay(delaytime1);
+  lc.setRow(0,0,r[0]);
+  lc.setRow(0,1,r[1]);
+  lc.setRow(0,2,r[2]);
+  lc.setRow(0,3,r[3]);
+  lc.setRow(0,4,r[4]);
+  delay(delaytime1);
+  lc.setRow(0,0,d[0]);
+  lc.setRow(0,1,d[1]);
+  lc.setRow(0,2,d[2]);
+  lc.setRow(0,3,d[3]);
+  lc.setRow(0,4,d[4]);
+  delay(delaytime1);
+  lc.setRow(0,0,u[0]);
+  lc.setRow(0,1,u[1]);
+  lc.setRow(0,2,u[2]);
+  lc.setRow(0,3,u[3]);
+  lc.setRow(0,4,u[4]);
+  delay(delaytime1);
+  lc.setRow(0,0,i[0]);
+  lc.setRow(0,1,i[1]);
+  lc.setRow(0,2,i[2]);
+  lc.setRow(0,3,i[3]);
+  lc.setRow(0,4,i[4]);
+  delay(delaytime1);
+  lc.setRow(0,0,n[0]);
+  lc.setRow(0,1,n[1]);
+  lc.setRow(0,2,n[2]);
+  lc.setRow(0,3,n[3]);
+  lc.setRow(0,4,n[4]);
+  delay(delaytime1);
+  lc.setRow(0,0,o[0]);
+  lc.setRow(0,1,o[1]);
+  lc.setRow(0,2,o[2]);
+  lc.setRow(0,3,o[3]);
+  lc.setRow(0,4,o[4]);
+  delay(delaytime1);
+  lc.setRow(0,0,0);
+  lc.setRow(0,1,0);
+  lc.setRow(0,2,0);
+  lc.setRow(0,3,0);
+  lc.setRow(0,4,0);
+  delay(delaytime1);
+}
+
+/*
+  This function lights up a some Leds in a row.
+ The pattern will be repeated on every row.
+ The pattern will blink along with the row-number.
+ row number 4 (index==3) will blink 4 times etc.
+ */
+void rows() {
+  for(int row=0;row<8;row++) {
+    delay(delaytime2);
+    lc.setRow(0,row,B10100000);
+    delay(delaytime2);
+    lc.setRow(0,row,(byte)0);
+    for(int i=0;i<row;i++) {
+      delay(delaytime2);
+      lc.setRow(0,row,B10100000);
+      delay(delaytime2);
+      lc.setRow(0,row,(byte)0);
+    }
+  }
+}
+
+/*
+  This function lights up a some Leds in a column.
+ The pattern will be repeated on every column.
+ The pattern will blink along with the column-number.
+ column number 4 (index==3) will blink 4 times etc.
+ */
+void columns() {
+  for(int col=0;col<8;col++) {
+    delay(delaytime2);
+    lc.setColumn(0,col,B00100000);
+    delay(delaytime2);
+    lc.setColumn(0,col,(byte)0);
+    for(int i=0;i<col;i++) {
+      delay(delaytime2);
+      lc.setColumn(0,col,B00100000);
+      delay(delaytime2);
+      lc.setColumn(0,col,(byte)0);
+    }
+  }
+}
+
+/* 
+ This function will light up every Led on the matrix.
+ The led will blink along with the row-number.
+ row number 4 (index==3) will blink 4 times etc.
+ */
+void single() {
+  for(int row=0;row<8;row++) {
+    for(int col=0;col<8;col++) {
+      delay(delaytime2);
+      lc.setLed(0,row,col,true);
+      delay(delaytime2);
+      for(int i=0;i<col;i++) {
+        lc.setLed(0,row,col,false);
+        delay(delaytime2);
+        lc.setLed(0,row,col,true);
+        delay(delaytime2);
+      }
+    }
+  }
+}
+
+void loop() { 
+  writeArduinoOnMatrix();
+  rows();
+  columns();
+  single();
+}
+// MPU-6050 Short Example Sketch
+//www.elegoo.com
+//2016.12.9
+
+#include<Wire.h>
+const int MPU_addr=0x68;  // I2C address of the MPU-6050
+int16_t AcX,AcY,AcZ,Tmp,GyX,GyY,GyZ;
+void setup(){
+  Wire.begin();
+  Wire.beginTransmission(MPU_addr);
+  Wire.write(0x6B);  // PWR_MGMT_1 register
+  Wire.write(0);     // set to zero (wakes up the MPU-6050)
+  Wire.endTransmission(true);
+  Serial.begin(9600);
+}
+void loop(){
+  Wire.beginTransmission(MPU_addr);
+  Wire.write(0x3B);  // starting with register 0x3B (ACCEL_XOUT_H)
+  Wire.endTransmission(false);
+  Wire.requestFrom(MPU_addr,14,true);  // request a total of 14 registers
+  AcX=Wire.read()<<8|Wire.read();  // 0x3B (ACCEL_XOUT_H) & 0x3C (ACCEL_XOUT_L)    
+  AcY=Wire.read()<<8|Wire.read();  // 0x3D (ACCEL_YOUT_H) & 0x3E (ACCEL_YOUT_L)
+  AcZ=Wire.read()<<8|Wire.read();  // 0x3F (ACCEL_ZOUT_H) & 0x40 (ACCEL_ZOUT_L)
+  Tmp=Wire.read()<<8|Wire.read();  // 0x41 (TEMP_OUT_H) & 0x42 (TEMP_OUT_L)
+  GyX=Wire.read()<<8|Wire.read();  // 0x43 (GYRO_XOUT_H) & 0x44 (GYRO_XOUT_L)
+  GyY=Wire.read()<<8|Wire.read();  // 0x45 (GYRO_YOUT_H) & 0x46 (GYRO_YOUT_L)
+  GyZ=Wire.read()<<8|Wire.read();  // 0x47 (GYRO_ZOUT_H) & 0x48 (GYRO_ZOUT_L)
+  Serial.print(" | AcX = "); Serial.println(AcX);
+  Serial.print(" | AcY = "); Serial.println(AcY);
+  Serial.print(" | AcZ = "); Serial.println(AcZ);
+  Serial.print(" | Tmp = "); Serial.println(Tmp/340.00+36.53);  //equation for temperature in degrees C from datasheet
+  Serial.print(" | GyX = "); Serial.println(GyX);
+  Serial.print(" | GyY = "); Serial.println(GyY);
+  Serial.print(" | GyZ = "); Serial.println(GyZ);
+  Serial.println();
+  delay(333);
+}
+/*
+   @Description: QMI8658C
+   @Author: ELEGOO
+   @Date: 2019-07-10 16:46:17
+   @LastEditTime: 2021-04-26 16:25:22
+   @LastEditors: Changhua
+*/
+
+#include "QMI8658C.h"
+#include "I2Cdev.h"
+QMI8658C _QMI8658C;
+
+void setup()
+{
+  Serial.begin(9600);
+  _QMI8658C.QMI8658C_dveInit();
+}
+
+void loop()
+{
+  uint8_t cmd[] = {AccX_L, AccY_L, AccZ_L, TEMP_L,GyrX_L, GyrY_L, GyrZ_L};
+  char cmdStr[][10] = {"  AcX:", "  AcY:", "  AcZ:","  Tmp:", "  GyX:", "  GyY:", "  GyZ:"};
+  static unsigned long Test_time; //获取时间戳 timestamp
+  if (millis() - Test_time > 50)
+  {
+    for (int i = 0; i < 7; i++)
+    {
+      Serial.print(cmdStr[i]);
+      if(i==3)
+      {
+        Serial.print(((QMI8658C_readBytes(cmd[i]))/256)-5.2);
+      }
+      else
+      {
+        Serial.print(QMI8658C_readBytes(cmd[i]));
+      }   
+      Serial.print("  |");
+    }
+    Serial.println();
+    Test_time = millis();
+  }
+}
+//www.elegoo.com
+//2016.12.9
+
+int ledPin = 13;  // LED on Pin 13 of Arduino
+int pirPin = 7; // Input for HC-S501
+
+int pirValue; // Place to store read PIR Value
+
+
+void setup() {
+  
+  pinMode(ledPin, OUTPUT);
+  pinMode(pirPin, INPUT);
+ 
+  digitalWrite(ledPin, LOW);
+  
+  
+  
+}
+
+void loop() {
+  pirValue = digitalRead(pirPin);
+  digitalWrite(ledPin, pirValue);
+
+}
+//www.elegoo.com
+//2016.12.9
+
+int adc_id = 0;
+int HistoryValue = 0;
+char printBuffer[128];
+
+void setup()
+{
+  Serial.begin(9600);
+}
+
+void loop()
+{
+    int value = analogRead(adc_id); // get adc value
+
+    if(((HistoryValue>=value) && ((HistoryValue - value) > 10)) || ((HistoryValue<value) && ((value - HistoryValue) > 10)))
+    {
+      sprintf(printBuffer,"ADC%d level is %d\n",adc_id, value);
+      Serial.print(printBuffer);
+      HistoryValue = value;
+    }
+}
+//www.elegoo.com
+//2018.10.24
+#include <Wire.h>
+#include <DS3231.h>
+
+DS3231 clock;
+RTCDateTime dt;
+
+void setup()
+{
+  Serial.begin(9600);
+
+  Serial.println("Initialize RTC module");
+  // Initialize DS3231
+  clock.begin();
+
+  
+  // Manual (YYYY, MM, DD, HH, II, SS
+  // clock.setDateTime(2016, 12, 9, 11, 46, 00);
+  
+  // Send sketch compiling time to Arduino
+  clock.setDateTime(__DATE__, __TIME__);    
+  /*
+  Tips:This command will be executed every time when Arduino restarts. 
+       Comment this line out to store the memory of DS3231 module
+  */
+}
+
+void loop()
+{
+  dt = clock.getDateTime();
+
+  // For leading zero look to DS3231_dateformat example
+
+  Serial.print("Raw data: ");
+  Serial.print(dt.year);   Serial.print("-");
+  Serial.print(dt.month);  Serial.print("-");
+  Serial.print(dt.day);    Serial.print(" ");
+  Serial.print(dt.hour);   Serial.print(":");
+  Serial.print(dt.minute); Serial.print(":");
+  Serial.print(dt.second); Serial.println("");
+
+  delay(1000);
+}
+//www.elegoo.com
+//2018.10.24
+#include <Wire.h>
+#include <DS3231.h>
+
+DS3231 clock;
+RTCDateTime dt;
+
+void setup()
+{
+  Serial.begin(9600);
+
+  Serial.println("Initialize DS3231");
+  // Initialize DS3231
+  clock.begin();
+
+  
+  // Manual (YYYY, MM, DD, HH, II, SS
+  // clock.setDateTime(2016, 12, 9, 11, 46, 00);
+  
+  // Send sketch compiling time to Arduino
+  clock.setDateTime(__DATE__, __TIME__);    
+  /*
+  Tips:This command will be executed every time when Arduino restarts. 
+       Comment this line out to store the memory of DS3231 module
+  */
+}
+
+void loop()
+{
+  dt = clock.getDateTime();
+
+  // For leading zero look to DS3231_dateformat example
+
+  Serial.print("Raw data: ");
+  Serial.print(dt.year);   Serial.print("-");
+  Serial.print(dt.month);  Serial.print("-");
+  Serial.print(dt.day);    Serial.print(" ");
+  Serial.print(dt.hour);   Serial.print(":");
+  Serial.print(dt.minute); Serial.print(":");
+  Serial.print(dt.second); Serial.println("");
+
+  delay(1000);
+}
+// www.elegoo.com
+// 2018.10.24
+/*
+  LED1 should be lit, showing power. LED2 indicates sound input, and the sensitivity is adjusted by potentiometer.
+  There is a tiny screw on the blue potentiometer block that you can use for adjustment. Turning that
+  clockwise lowers the potentiometer value, while counter-clockwise raises the potentiometer value.
+  Use the potentiometer to adjust the Sound Sensor sensitivity. Turn the potentiometer
+  several rotations until you see the LED2 extinguish (or just faintly blink). This might be slightly greater than
+  500, if you are also watching Serial Monitor (inital adjustment), or, Serial Plotter (the latter is prefererd for observation).
+  Special thanks to user CRomer, for his input and hard work!
+*/
+
+int  sensorAnalogPin = A0;    // Select the Arduino input pin to accept the Sound Sensor's analog output 
+int  sensorDigitalPin = 3;    // Select the Arduino input pin to accept the Sound Sensor's digital output
+int  analogValue = 0;         // Define variable to store the analog value coming from the Sound Sensor
+int  digitalValue;            // Define variable to store the digital value coming from the Sound Sensor
+int  Led13 = 13;              // Define LED port; this is the LED built in to the Arduino (labled L)
+                              // When D0 from the Sound Sensor (connnected to pin 3 on the
+                              // Arduino) sends High (voltage present), L will light. In practice, you
+                              // should see LED13 on the Arduino blink when LED2 on the Sensor is 100% lit.
+                              
+
+void setup()
+{
+  Serial.begin(9600);               // The IDE settings for Serial Monitor/Plotter (preferred) must match this speed
+  pinMode(sensorDigitalPin,INPUT);  // Define pin 3 as an input port, to accept digital input
+  pinMode(Led13,OUTPUT);            // Define LED13 as an output port, to indicate digital trigger reached
+}
+
+void loop(){
+  analogValue = analogRead(sensorAnalogPin); // Read the value of the analog interface A0 assigned to digitalValue 
+  digitalValue=digitalRead(sensorDigitalPin); // Read the value of the digital interface 3 assigned to digitalValue 
+  Serial.println(analogValue); // Send the analog value to the serial transmit interface
+  
+  if(digitalValue==HIGH)      // When the Sound Sensor sends signla, via voltage present, light LED13 (L)
+  {
+    digitalWrite(Led13,HIGH);
+  }
+  else
+  {
+    digitalWrite(Led13,LOW);
+  }
+  
+  delay(50);                  // Slight pause so that we don't overwhelm the serial interface
+}//www.elegoo.com
+//2016.12.09
+
+/*
+ * --------------------------------------------------------------------------------------------------------------------
+ * Example to change UID of changeable MIFARE card.
+ * --------------------------------------------------------------------------------------------------------------------
+ * This is a MFRC522 library example; for further details and other examples see: https://github.com/miguelbalboa/rfid
+ * 
+ * This sample shows how to set the UID on a UID changeable MIFARE card.
+ * NOTE: for more informations read the README.rst
+ * 
+ * @author Tom Clement
+ * @license Released into the public domain.
+ *
+ * Typical pin layout used:
+ * -----------------------------------------------------------------------------------------
+ *             MFRC522      Arduino       Arduino   Arduino    Arduino          Arduino
+ *             Reader/PCD   Uno           Mega      Nano v3    Leonardo/Micro   Pro Micro
+ * Signal      Pin          Pin           Pin       Pin        Pin              Pin
+ * -----------------------------------------------------------------------------------------
+ * RST/Reset   RST          9             5         D9         RESET/ICSP-5     RST
+ * SPI SS      SDA(SS)      10            53        D10        10               10
+ * SPI MOSI    MOSI         11 / ICSP-4   51        D11        ICSP-4           16
+ * SPI MISO    MISO         12 / ICSP-1   50        D12        ICSP-1           14
+ * SPI SCK     SCK          13 / ICSP-3   52        D13        ICSP-3           15
+ */
+
+#include <SPI.h>
+#include <MFRC522.h>
+
+#define RST_PIN   5     // Configurable, see typical pin layout above
+#define SS_PIN    53   // Configurable, see typical pin layout above
+
+MFRC522 mfrc522(SS_PIN, RST_PIN);   // Create MFRC522 instance
+
+/* Set your new UID here! */
+#define NEW_UID {0xDE, 0xAD, 0xBE, 0xEF}
+
+MFRC522::MIFARE_Key key;
+
+void setup() {
+  Serial.begin(9600);  // Initialize serial communications with the PC
+  while (!Serial);     // Do nothing if no serial port is opened (added for Arduinos based on ATMEGA32U4)
+  SPI.begin();         // Init SPI bus
+  mfrc522.PCD_Init();  // Init MFRC522 card
+  Serial.println(F("Warning: this example overwrites the UID of your UID changeable card, use with care!"));
+  
+  // Prepare key - all keys are set to FFFFFFFFFFFFh at chip delivery from the factory.
+  for (byte i = 0; i < 6; i++) {
+    key.keyByte[i] = 0xFF;
+  }
+}
+
+// Setting the UID can be as simple as this:
+//void loop() {
+//  byte newUid[] = NEW_UID;
+//  if ( mfrc522.MIFARE_SetUid(newUid, (byte)4, true) ) {
+//    Serial.println("Wrote new UID to card.");
+//  }
+//  delay(1000);
+//}
+
+// But of course this is a more proper approach
+void loop() {
+  
+  // Look for new cards, and select one if present
+  if ( ! mfrc522.PICC_IsNewCardPresent() || ! mfrc522.PICC_ReadCardSerial() ) {
+    delay(50);
+    return;
+  }
+  
+  // Now a card is selected. The UID and SAK is in mfrc522.uid.
+  
+  // Dump UID
+  Serial.print(F("Card UID:"));
+  for (byte i = 0; i < mfrc522.uid.size; i++) {
+    Serial.print(mfrc522.uid.uidByte[i] < 0x10 ? " 0" : " ");
+    Serial.print(mfrc522.uid.uidByte[i], HEX);
+  } 
+  Serial.println();
+
+  // Dump PICC type
+//  MFRC522::PICC_Type piccType = mfrc522.PICC_GetType(mfrc522.uid.sak);
+//  Serial.print(F("PICC type: "));
+//  Serial.print(mfrc522.PICC_GetTypeName(piccType));
+//  Serial.print(F(" (SAK "));
+//  Serial.print(mfrc522.uid.sak);
+//  Serial.print(")\r\n");
+//  if (  piccType != MFRC522::PICC_TYPE_MIFARE_MINI 
+//    &&  piccType != MFRC522::PICC_TYPE_MIFARE_1K
+//    &&  piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
+//    Serial.println(F("This sample only works with MIFARE Classic cards."));
+//    return;
+//  }
+  
+  // Set new UID
+  byte newUid[] = NEW_UID;
+  if ( mfrc522.MIFARE_SetUid(newUid, (byte)4, true) ) {
+    Serial.println(F("Wrote new UID to card."));
+  }
+  
+  // Halt PICC and re-select it so DumpToSerial doesn't get confused
+  mfrc522.PICC_HaltA();
+  if ( ! mfrc522.PICC_IsNewCardPresent() || ! mfrc522.PICC_ReadCardSerial() ) {
+    return;
+  }
+  
+  // Dump the new memory contents
+  Serial.println(F("New UID and contents:"));
+  mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
+  
+  delay(2000);
+}
+//www.elegoo.com
+//2016.12.9
+
+/*
+  LiquidCrystal Library - Hello World
+
+ Demonstrates the use a 16x2 LCD display.  The LiquidCrystal
+ library works with all LCD displays that are compatible with the
+ Hitachi HD44780 driver. There are many of them out there, and you
+ can usually tell them by the 16-pin interface.
+
+ This sketch prints "Hello World!" to the LCD
+ and shows the time.
+
+  The circuit:
+ * LCD RS pin to digital pin 7
+ * LCD Enable pin to digital pin 8
+ * LCD D4 pin to digital pin 9
+ * LCD D5 pin to digital pin 10
+ * LCD D6 pin to digital pin 11
+ * LCD D7 pin to digital pin 12
+ * LCD R/W pin to ground
+ * LCD VSS pin to ground
+ * LCD VCC pin to 5V
+ * 10K resistor:
+ * ends to +5V and ground
+ * wiper to LCD VO pin (pin 3)
+
+ Library originally added 18 Apr 2008
+ by David A. Mellis
+ library modified 5 Jul 2009
+ by Limor Fried (http://www.ladyada.net)
+ example added 9 Jul 2009
+ by Tom Igoe
+ modified 22 Nov 2010
+ by Tom Igoe
+
+ This example code is in the public domain.
+
+ http://www.arduino.cc/en/Tutorial/LiquidCrystal
+ */
+
+// include the library code:
+#include <LiquidCrystal.h>
+
+// initialize the library with the numbers of the interface pins
+LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+
+void setup() {
+  // set up the LCD's number of columns and rows:
+  lcd.begin(16, 2);
+  // Print a message to the LCD.
+  lcd.print("Hello, World!");
+}
+
+void loop() {
+  // set the cursor to column 0, line 1
+  // (note: line 1 is the second row, since counting begins with 0):
+  lcd.setCursor(0, 1);
+  // print the number of seconds since reset:
+  lcd.print(millis() / 1000);
+}
+
+//www.elegoo.com
+//2016.12.9
+
+#include <LiquidCrystal.h>
+int tempPin = 0;
+//                BS  E  D4 D5  D6 D7
+LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+void setup()
+{
+  lcd.begin(16, 2);
+}
+void loop()
+{
+  int tempReading = analogRead(tempPin);
+  // This is OK
+  double tempK = log(10000.0 * ((1024.0 / tempReading - 1)));
+  tempK = 1 / (0.001129148 + (0.000234125 + (0.0000000876741 * tempK * tempK )) * tempK );       //  Temp Kelvin
+  float tempC = tempK - 273.15;            // Convert Kelvin to Celcius
+  float tempF = (tempC * 9.0)/ 5.0 + 32.0; // Convert Celcius to Fahrenheit
+  /*  replaced
+    float tempVolts = tempReading * 5.0 / 1024.0;
+    float tempC = (tempVolts - 0.5) * 10.0;
+    float tempF = tempC * 9.0 / 5.0 + 32.0;
+  */
+  // Display Temperature in C
+  lcd.setCursor(0, 0);
+  lcd.print("Temp         C  ");
+  // Display Temperature in F
+  //lcd.print("Temp         F  ");
+  lcd.setCursor(6, 0);
+  // Display Temperature in C
+  lcd.print(tempC);
+  // Display Temperature in F
+  //lcd.print(tempF);
+  delay(500);
+}
+//www.elegoo.com
+//2016.12.9 
+
+int tDelay = 100;
+int latchPin = 11;      // (11) ST_CP [RCK] on 74HC595
+int clockPin = 9;      // (9) SH_CP [SCK] on 74HC595
+int dataPin = 12;     // (12) DS [S1] on 74HC595
+
+byte leds = 0;
+
+void updateShiftRegister()
+{
+   digitalWrite(latchPin, LOW);
+   shiftOut(dataPin, clockPin, LSBFIRST, leds);
+   digitalWrite(latchPin, HIGH);
+}
+
+void setup() 
+{
+  pinMode(latchPin, OUTPUT);
+  pinMode(dataPin, OUTPUT);  
+  pinMode(clockPin, OUTPUT);
+}
+
+void loop() 
+{
+  leds = 0;
+  updateShiftRegister();
+  delay(tDelay);
+  for (int i = 0; i < 8; i++)
+  {
+    bitSet(leds, i);
+    updateShiftRegister();
+    delay(tDelay);
+  }
+}
+
+//www.elegoo.com
+//2017.12.9
+
+int latchPin = 11;
+int clockPin = 9;
+int dataPin = 12;
+
+byte leds = 0;
+void updateShiftRegister()
+{
+   digitalWrite(latchPin, LOW);
+   shiftOut(dataPin, clockPin, LSBFIRST, leds);
+   digitalWrite(latchPin, HIGH);
+}
+void setup() 
+{
+  pinMode(latchPin, OUTPUT);
+  pinMode(dataPin, OUTPUT);  
+  pinMode(clockPin, OUTPUT);
+  updateShiftRegister();
+  Serial.begin(9600);
+  while (! Serial); // Wait untilSerial is ready - Leonardo
+  Serial.println("Enter LED Number 0 to 7 or 'x' to clear");
+}
+
+void loop() 
+{
+  if (Serial.available())
+  {
+    char ch = Serial.read();
+    if (ch >= '0' && ch <= '7')
+    {
+      int led = ch - '0';
+      bitSet(leds, led);
+      updateShiftRegister();
+      Serial.print("Turned on LED ");
+      Serial.println(led);
+    }
+    if (ch == 'x')
+    {
+      leds = 0;
+      updateShiftRegister();
+      Serial.println("Cleared");
+    }
+  }
+}
+
+
+//www.elegoo.com
+//2016.12.9
+
+int lightPin = 0;
+int latchPin = 11;
+int clockPin = 9;
+int dataPin = 12;
+
+int leds = 0;
+
+void setup() 
+{
+  pinMode(latchPin, OUTPUT);
+  pinMode(dataPin, OUTPUT);  
+  pinMode(clockPin, OUTPUT);
+}
+void updateShiftRegister()
+{
+   digitalWrite(latchPin, LOW);
+   shiftOut(dataPin, clockPin, LSBFIRST, leds);
+   digitalWrite(latchPin, HIGH);
+}
+void loop() 
+{
+  int reading  = analogRead(lightPin);
+  int numLEDSLit = reading / 57;  //1023 / 9 / 2
+  if (numLEDSLit > 8) numLEDSLit = 8;
+  leds = 0;   // no LEDs lit to start
+  for (int i = 0; i < numLEDSLit; i++)
+  {
+    leds = leds + (1 << i);  // sets the i'th bit
+  }
+  updateShiftRegister();
+}
+
+
+//www.elegoo.com
+//2016.12.12
+
+// define the LED digit patterns, from 0 - 9
+// 1 = LED on, 0 = LED off, in this order:
+//                74HC595 pin     Q0,Q1,Q2,Q3,Q4,Q5,Q6,Q7 
+//                Mapping to      a,b,c,d,e,f,g of Seven-Segment LED
+byte seven_seg_digits[10] = { B11111100,  // = 0
+                              B01100000,  // = 1
+                              B11011010,  // = 2
+                              B11110010,  // = 3
+                              B01100110,  // = 4
+                              B10110110,  // = 5
+                              B10111110,  // = 6
+                              B11100000,  // = 7
+                              B11111110,  // = 8
+                              B11100110   // = 9
+                             };
+ 
+// connect to the ST_CP of 74HC595 (pin 3,latch pin)
+int latchPin = 3;
+// connect to the SH_CP of 74HC595 (pin 4, clock pin)
+int clockPin = 4;
+// connect to the DS of 74HC595 (pin 2)
+int dataPin = 2;
+ 
+void setup() {
+  // Set latchPin, clockPin, dataPin as output
+  pinMode(latchPin, OUTPUT);
+  pinMode(clockPin, OUTPUT);
+  pinMode(dataPin, OUTPUT);
+}
+ 
+// display a number on the digital segment display
+void sevenSegWrite(byte digit) {
+  // set the latchPin to low potential, before sending data
+  digitalWrite(latchPin, LOW);
+     
+  // the original data (bit pattern)
+  shiftOut(dataPin, clockPin, LSBFIRST, seven_seg_digits[digit]);  
+ 
+  // set the latchPin to high potential, after sending data
+  digitalWrite(latchPin, HIGH);
+}
+ 
+void loop() {       
+  // count from 9 to 0
+  for (byte digit = 10; digit > 0; --digit) {
+    delay(1000);
+    sevenSegWrite(digit - 1); 
+  }
+   
+  // suspend 4 seconds
+  delay(1000);
+}
+//www.elegoo.com
+//2016.12.12
+
+int latch=9;  //74HC595  pin 9 STCP
+int clock=10; //74HC595  pin 10 SHCP
+int data=8;   //74HC595  pin 8 DS
+
+unsigned char table[]=
+{0x3f,0x06,0x5b,0x4f,0x66,0x6d,0x7d,0x07,0x7f,0x6f,0x77,0x7c
+,0x39,0x5e,0x79,0x71,0x00};
+
+void setup() {
+  pinMode(latch,OUTPUT);
+  pinMode(clock,OUTPUT);
+  pinMode(data,OUTPUT);
+}
+void Display(unsigned char num)
+{
+
+  digitalWrite(latch,LOW);
+  shiftOut(data,clock,MSBFIRST,table[num]);
+  digitalWrite(latch,HIGH);
+  
+}
+void loop() {
+  Display(1);
+  delay(500);
+  Display(2);
+  delay(500);
+  Display(3);
+  delay(500);
+  Display(4);
+  delay(500);
+  Display(5);
+  delay(500);
+  Display(6);
+  delay(500);
+  Display(7);
+  delay(500);
+  Display(8);
+  delay(500);
+  Display(9);
+  delay(500);
+  Display(10);
+  delay(500);
+  Display(11);
+  delay(500);
+  Display(12);
+  delay(500);
+  Display(13);
+  delay(500);
+  Display(14);
+  delay(500);
+  Display(15);
+  delay(500);
+}
+//www.elegoo.com
+//2017.12.12
+
+/************************
+Exercise the motor using
+the L293D chip
+************************/
+
+#define ENABLE 5
+#define DIRA 3
+#define DIRB 4
+
+int i;
+ 
+void setup() {
+  //---set pin direction
+  pinMode(ENABLE,OUTPUT);
+  pinMode(DIRA,OUTPUT);
+  pinMode(DIRB,OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  //---back and forth example
+    Serial.println("One way, then reverse");
+    digitalWrite(ENABLE,HIGH); // enable on
+    for (i=0;i<5;i++) {
+    digitalWrite(DIRA,HIGH); //one way
+    digitalWrite(DIRB,LOW);
+    delay(500);
+    digitalWrite(DIRA,LOW);  //reverse
+    digitalWrite(DIRB,HIGH);
+    delay(500);
+  }
+  digitalWrite(ENABLE,LOW); // disable
+  delay(2000);
+
+  Serial.println("fast Slow example");
+  //---fast/slow stop example
+  digitalWrite(ENABLE,HIGH); //enable on
+  digitalWrite(DIRA,HIGH); //one way
+  digitalWrite(DIRB,LOW);
+  delay(3000);
+  digitalWrite(ENABLE,LOW); //slow stop
+  delay(1000);
+  digitalWrite(ENABLE,HIGH); //enable on
+  digitalWrite(DIRA,LOW); //one way
+  digitalWrite(DIRB,HIGH);
+  delay(3000);
+  digitalWrite(DIRA,LOW); //fast stop
+  delay(2000);
+
+  Serial.println("PWM full then slow");
+  //---PWM example, full speed then slow
+  analogWrite(ENABLE,255); //enable on
+  digitalWrite(DIRA,HIGH); //one way
+  digitalWrite(DIRB,LOW);
+  delay(2000);
+  analogWrite(ENABLE,180); //half speed
+  delay(2000);
+  analogWrite(ENABLE,128); //half speed
+  delay(2000);
+  analogWrite(ENABLE,50); //half speed
+  delay(2000);
+  analogWrite(ENABLE,128); //half speed
+  delay(2000);
+  analogWrite(ENABLE,180); //half speed
+  delay(2000);
+  analogWrite(ENABLE,255); //half speed
+  delay(2000);
+  digitalWrite(ENABLE,LOW); //all done
+  delay(10000);
+}
+   
+//www.elegoo.com
+//2022.03.10
+
+/************************
+  Exercise the motor using
+  the relay
+************************/
+
+#define ENABLE 5
+#define DIRA 4
+#define DIRB 3
+
+int i;
+
+void setup() {
+  //---set pin direction
+  pinMode(ENABLE, OUTPUT);
+  pinMode(DIRA, OUTPUT);
+  pinMode(DIRB, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+
+  //---relay example
+  digitalWrite(ENABLE, HIGH); // enable on
+  for (i = 0; i < 5; i++)
+  {
+    Serial.println("spin");
+    digitalWrite(DIRA, HIGH); //motor spins
+    digitalWrite(DIRB, LOW);
+    delay(2000);
+    Serial.println("stop");
+    digitalWrite(DIRA, LOW); //motor stops
+    digitalWrite(DIRB, HIGH);
+    delay(2000);
+  }
+}
+//www.elegoo.com
+//2018.10.25
+
+/*
+  Stepper Motor Control - one revolution
+
+  This program drives a unipolar or bipolar stepper motor.
+  The motor is attached to digital pins 8 - 11 of the Arduino.
+
+  The motor should revolve one revolution in one direction, then
+  one revolution in the other direction.
+
+*/
+
+#include <Stepper.h>
+
+const int stepsPerRevolution = 2048;  // change this to fit the number of steps per revolution
+const int rolePerMinute = 15;         // Adjustable range of 28BYJ-48 stepper is 0~17 rpm
+
+// initialize the stepper library on pins 8 through 11:
+Stepper myStepper(stepsPerRevolution, 8, 10, 9, 11);
+
+void setup() {
+  myStepper.setSpeed(rolePerMinute);
+  // initialize the serial port:
+  Serial.begin(9600);
+}
+
+void loop() {  
+  // step one revolution  in one direction:
+  Serial.println("clockwise");
+  myStepper.step(stepsPerRevolution);
+  delay(500);
+
+  // step one revolution in the other direction:
+  Serial.println("counterclockwise");
+  myStepper.step(-stepsPerRevolution);
+  delay(500);
+}
+//www.elegoo.com
+//2023.05.06
+
+#include "Stepper.h"
+#include "IRremote.h"
+
+/*----- Variables, Pins -----*/
+#define STEPS  32   // Number of steps per revolution of Internal shaft
+int  Steps2Take;  // 2048 = 1 Revolution
+int receiver = 12; // Signal Pin of IR receiver to Arduino Digital Pin 12
+
+/*-----( Declare objects )-----*/
+// Setup of proper sequencing for Motor Driver Pins
+// In1, In2, In3, In4 in the sequence 1-3-2-4
+
+Stepper small_stepper(STEPS, 8, 10, 9, 11);
+IRrecv irrecv(receiver);    // create instance of 'irrecv'
+uint32_t last_decodedRawData = 0;//vairable uses to store the last decodedRawData
+
+void setup()
+{
+  irrecv.enableIRIn(); // Start the receiver
+}
+
+void loop()
+{
+  if (irrecv.decode()) // have we received an IR signal?
+  {
+    // Check if it is a repeat IR code
+    if (irrecv.decodedIRData.flags)
+    {
+      //set the current decodedRawData to the last decodedRawData
+      irrecv.decodedIRData.decodedRawData = last_decodedRawData;
+    }
+    switch (irrecv.decodedIRData.decodedRawData)
+    {
+
+      case 0xB946FF00: // VOL+ button pressed
+        small_stepper.setSpeed(500); //Max seems to be 500
+        Steps2Take  =  -2048;  // Rotate CW
+        small_stepper.step(Steps2Take);
+        delay(2000);
+        break;
+
+      case 0xEA15FF00: // VOL- button pressed
+        small_stepper.setSpeed(500);
+        Steps2Take  =  2048;  // Rotate CCW
+        small_stepper.step(Steps2Take);
+        delay(2000);
+        break;
+
+    }
+    //store the last decodedRawData
+    last_decodedRawData = irrecv.decodedIRData.decodedRawData;
+    irrecv.resume(); // receive the next value
+    digitalWrite(8, LOW);
+    digitalWrite(9, LOW);
+    digitalWrite(10, LOW);
+    digitalWrite(11, LOW);
+  }
+
+}/* --end main loop -- */
+//www.elegoo.com
+//2016.12.12
+
+#include "Stepper.h"
+#define STEPS  32   // Number of steps for one revolution of Internal shaft
+                    // 2048 steps for one revolution of External shaft
+
+volatile boolean TurnDetected;  // need volatile for Interrupts
+volatile boolean rotationdirection;  // CW or CCW rotation
+
+const int PinCLK=2;   // Generating interrupts using CLK signal
+const int PinDT=3;    // Reading DT signal
+const int PinSW=4;    // Reading Push Button switch
+
+int RotaryPosition=0;    // To store Stepper Motor Position
+
+int PrevPosition;     // Previous Rotary position Value to check accuracy
+int StepsToTake;      // How much to move Stepper
+
+// Setup of proper sequencing for Motor Driver Pins
+// In1, In2, In3, In4 in the sequence 1-3-2-4
+Stepper small_stepper(STEPS, 8, 10, 9, 11);
+
+// Interrupt routine runs if CLK goes from HIGH to LOW
+void isr ()  {
+  delay(4);  // delay for Debouncing
+  if (digitalRead(PinCLK))
+    rotationdirection= digitalRead(PinDT);
+  else
+    rotationdirection= !digitalRead(PinDT);
+  TurnDetected = true;
+}
+
+void setup ()  {
+  
+pinMode(PinCLK,INPUT);
+pinMode(PinDT,INPUT);  
+pinMode(PinSW,INPUT);
+digitalWrite(PinSW, HIGH); // Pull-Up resistor for switch
+attachInterrupt (0,isr,FALLING); // interrupt 0 always connected to pin 2 on Arduino UNO
+}
+
+void loop ()  {
+  small_stepper.setSpeed(700); //Max seems to be 700
+  if (!(digitalRead(PinSW))) {   // check if button is pressed
+    if (RotaryPosition == 0) {  // check if button was already pressed
+    } else {
+        small_stepper.step(-(RotaryPosition*50));
+        RotaryPosition=0; // Reset position to ZERO
+      }
+    }
+
+  // Runs if rotation was detected
+  if (TurnDetected)  {
+    PrevPosition = RotaryPosition; // Save previous position in variable
+    if (rotationdirection) {
+      RotaryPosition=RotaryPosition-1;} // decrase Position by 1
+    else {
+      RotaryPosition=RotaryPosition+1;} // increase Position by 1
+
+    TurnDetected = false;  // do NOT repeat IF loop until new rotation detected
+
+    // Which direction to move Stepper motor
+    if ((PrevPosition + 1) == RotaryPosition) { // Move motor CW
+      StepsToTake=50; 
+      small_stepper.step(StepsToTake);
+    }
+
+    if ((RotaryPosition + 1) == PrevPosition) { // Move motor CCW
+      StepsToTake=-50;
+      small_stepper.step(StepsToTake);
+    }
+  }
+     digitalWrite(8, LOW);
+     digitalWrite(9, LOW);
+     digitalWrite(10, LOW);
+     digitalWrite(11, LOW);     
+}
+//www.elegoo.com
+//2016.12.8
+
+// Define Pins
+#define BLUE 3
+#define GREEN 5
+#define RED 6
+
+void setup()
+{
+pinMode(RED, OUTPUT);
+pinMode(GREEN, OUTPUT);
+pinMode(BLUE, OUTPUT);
+digitalWrite(RED, HIGH);
+digitalWrite(GREEN, LOW);
+digitalWrite(BLUE, LOW);
+}
+
+// define variables
+int redValue;
+int greenValue;
+int blueValue;
+
+// main loop
+void loop()
+{
+#define delayTime 10 // fading time between colors
+
+redValue = 255; // choose a value between 1 and 255 to change the color.
+greenValue = 0;
+blueValue = 0;
+
+// this is unnecessary as we've either turned on RED in SETUP
+// or in the previous loop ... regardless, this turns RED off
+// analogWrite(RED, 0);
+// delay(1000);
+
+for(int i = 0; i < 255; i += 1) // fades out red bring green full when i=255
+{
+redValue -= 1;
+greenValue += 1;
+// The following was reversed, counting in the wrong directions
+// analogWrite(RED, 255 - redValue);
+// analogWrite(GREEN, 255 - greenValue);
+analogWrite(RED, redValue);
+analogWrite(GREEN, greenValue);
+delay(delayTime);
+}
+
+redValue = 0;
+greenValue = 255;
+blueValue = 0;
+
+for(int i = 0; i < 255; i += 1) // fades out green bring blue full when i=255
+{
+greenValue -= 1;
+blueValue += 1;
+// The following was reversed, counting in the wrong directions
+// analogWrite(GREEN, 255 - greenValue);
+// analogWrite(BLUE, 255 - blueValue);
+analogWrite(GREEN, greenValue);
+analogWrite(BLUE, blueValue);
+delay(delayTime);
+}
+
+redValue = 0;
+greenValue = 0;
+blueValue = 255;
+
+for(int i = 0; i < 255; i += 1) // fades out blue bring red full when i=255
+{
+// The following code has been rearranged to match the other two similar sections
+blueValue -= 1;
+redValue += 1;
+// The following was reversed, counting in the wrong directions
+// analogWrite(BLUE, 255 - blueValue);
+// analogWrite(RED, 255 - redValue);
+analogWrite(BLUE, blueValue);
+analogWrite(RED, redValue);
+delay(delayTime);
+}
+}
+
+//www.elegoo.com
+//2016.12.08
+
+int ledPin = 5;
+int buttonApin = 9;
+int buttonBpin = 8;
+
+byte leds = 0;
+
+void setup() 
+{
+  pinMode(ledPin, OUTPUT);
+  pinMode(buttonApin, INPUT_PULLUP);  
+  pinMode(buttonBpin, INPUT_PULLUP);  
+}
+
+void loop() 
+{
+  if (digitalRead(buttonApin) == LOW)
+  {
+    digitalWrite(ledPin, HIGH);
+  }
+  if (digitalRead(buttonBpin) == LOW)
+  {
+    digitalWrite(ledPin, LOW);
+  }
+}
+//www.elegoo.com
+//2023.05.06
+
+int buzzer = 12;//the pin of the active buzzer
+void setup()
+{
+  pinMode(buzzer, OUTPUT); //initialize the buzzer pin as an output
+}
+void loop()
+{
+  int sound_duration = 500;
+  for (int i = 0; i < 20; i++)
+  {
+    //use the if function to gradually shorten the interval of the sound
+    if (i < 5)
+    {
+      sound_duration = 500;
+    } else if (i < 10)
+    {
+      sound_duration = 300;
+    } else if (i < 20)
+    {
+      sound_duration = 100;
+    }
+    //activate the active buzzer
+    digitalWrite(buzzer, HIGH);
+    delay(sound_duration);//wait for sound_duration ms
+    //deactivate the active buzzer
+    digitalWrite(buzzer, LOW);
+    delay(sound_duration);//wait for sound_duration ms
+  }
+  //activate the active buzzer
+  digitalWrite(buzzer, HIGH);
+  delay(5000);//keep playing sound for 5 seconds.
+}
+//www.elegoo.com
+//2016.12.08
+
+#include "pitches.h"
+ 
+// notes in the melody:
+int melody[] = {
+  NOTE_C5, NOTE_D5, NOTE_E5, NOTE_F5, NOTE_G5, NOTE_A5, NOTE_B5, NOTE_C6};
+int duration = 500;  // 500 miliseconds
+ 
+void setup() {
+ 
+}
+ 
+void loop() {  
+  for (int thisNote = 0; thisNote < 8; thisNote++) {
+    // pin8 output the voice, every scale is 0.5 sencond
+    tone(8, melody[thisNote], duration);
+     
+    // Output the voice after several minutes
+    delay(1000);
+  }
+   
+  // restart after two seconds 
+  delay(2000);
+}
+//www.elegoo.com
+//2016.12.08
+/*****************************************/
+const int ledPin = 13;//the led attach to
+
+void setup()
+{ 
+  pinMode(ledPin,OUTPUT);//initialize the ledPin as an output
+  pinMode(2,INPUT);
+  digitalWrite(2, HIGH);
+} 
+/******************************************/
+void loop() 
+{  
+  int digitalVal = digitalRead(2);
+  if(HIGH == digitalVal)
+  {
+    digitalWrite(ledPin,LOW);//turn the led off
+  }
+  else
+  {
+    digitalWrite(ledPin,HIGH);//turn the led on 
+  }
+}
+/**********************************************/
+
+// www.elegoo.com
+// 2018.12.19
+#include <Servo.h>
+Servo myservo;
+
+void setup() {
+    myservo.attach(9);
+}
+
+void loop() {
+    for (int a = 0; a <= 180; a++) {
+        myservo.write(a);
+        delay(10);
+    }
+    for (int a = 180; a >= 0; a--) {
+        myservo.write(a);
+        delay(10);
+    }
+}
+/*
+ * ===============================================================================
+ * COMPLETE ARDUINO SENSOR LIBRARY
+ * ===============================================================================
+ * A comprehensive library combining multiple sensors and components
+ * Based on Elegoo examples and enhanced with modular functions
+ *
+ * Author: Arduino Community / Elegoo
+ * Modified: Enhanced with modular structure and documentation
+ * Date: 2025
+ *
+ * SUPPORTED COMPONENTS:
+ * - Ultrasonic Sensor (HC-SR04)
+ * - Keypad (4x4)
+ * - DHT11 Temperature/Humidity Sensor
+ * - Joystick
+ * - IR Remote Receiver
+ * - LED Matrix (MAX7219)
+ * - MPU6050 Accelerometer/Gyroscope
+ * - PIR Motion Sensor
+ * - Photoresistor
+ * - DS3231 RTC Clock
+ * - Sound Sensor
+ * - RFID (MFRC522)
+ * - LCD Display (16x2)
+ * - Shift Register (74HC595)
+ * - Seven Segment Display
+ * - DC Motor Control
+ * - Stepper Motor
+ * - RGB LED
+ * - Servo Motor
+ * - Active/Passive Buzzer
+ *
+ * USAGE:
+ * 1. Uncomment the components you want to use in the setup() function
+ * 2. Call the respective functions in loop() or as needed
+ * 3. Adjust pin definitions as needed for your wiring
+ * ===============================================================================
+ */
+
+// ===============================================================================
+// LIBRARY INCLUDES
+// ===============================================================================
+#include "IRremote.h"        // IR receiver
+#include "LedControl.h"      // LED Matrix
+#include "SR04.h"            // Ultrasonic sensor
+#include "pitches.h"         // Musical notes (you'll need to create this file)
+#include <DS3231.h>          // RTC clock
+#include <Keypad.h>          // 4x4 Keypad
+#include <LiquidCrystal.h>   // LCD display
+#include <MFRC522.h>         // RFID
+#include <SPI.h>             // SPI communication
+#include <Servo.h>           // Servo motor
+#include <Stepper.h>         // Stepper motor
+#include <Wire.h>            // I2C communication
+#include <dht_nonblocking.h> // DHT11 sensor
+
+// ===============================================================================
+// PIN DEFINITIONS
+// ===============================================================================
+
+// Ultrasonic Sensor (HC-SR04)
+#define TRIG_PIN 12
+#define ECHO_PIN 11
+
+// Keypad pins
+byte rowPins[4] = {9, 8, 7, 6};
+byte colPins[4] = {5, 4, 3, 2};
+
+// DHT11 sensor
+#define DHT_SENSOR_PIN 2
+#define DHT_SENSOR_TYPE DHT_TYPE_11
+
+// Joystick pins
+#define SW_PIN 2
+#define X_PIN 0
+#define Y_PIN 1
+
+// IR Receiver
+#define IR_RECEIVER_PIN 11
+
+// LED Matrix (MAX7219)
+#define LED_MATRIX_DATA_PIN 12
+#define LED_MATRIX_CLK_PIN 10
+#define LED_MATRIX_CS_PIN 11
+
+// MPU6050 I2C address
+#define MPU_ADDR 0x68
+
+// PIR Motion Sensor
+#define PIR_PIN 7
+#define PIR_LED_PIN 13
+
+// Photoresistor
+#define PHOTO_PIN 0
+
+// Sound Sensor
+#define SOUND_ANALOG_PIN A0
+#define SOUND_DIGITAL_PIN 3
+#define SOUND_LED_PIN 13
+
+// RFID (MFRC522)
+#define RFID_RST_PIN 5
+#define RFID_SS_PIN 53
+
+// LCD Display
+#define LCD_RS 7
+#define LCD_EN 8
+#define LCD_D4 9
+#define LCD_D5 10
+#define LCD_D6 11
+#define LCD_D7 12
+
+// Shift Register (74HC595)
+#define SHIFT_LATCH_PIN 11
+#define SHIFT_CLOCK_PIN 9
+#define SHIFT_DATA_PIN 12
+
+// Seven Segment Display
+#define SEVEN_SEG_LATCH_PIN 3
+#define SEVEN_SEG_CLOCK_PIN 4
+#define SEVEN_SEG_DATA_PIN 2
+
+// Motor Control (L293D)
+#define MOTOR_ENABLE_PIN 5
+#define MOTOR_DIR_A_PIN 3
+#define MOTOR_DIR_B_PIN 4
+
+// Stepper Motor
+#define STEPPER_STEPS 2048
+#define STEPPER_PIN1 8
+#define STEPPER_PIN2 10
+#define STEPPER_PIN3 9
+#define STEPPER_PIN4 11
+
+// RGB LED
+#define RGB_RED_PIN 6
+#define RGB_GREEN_PIN 5
+#define RGB_BLUE_PIN 3
+
+// Servo Motor
+#define SERVO_PIN 9
+
+// Buzzer
+#define BUZZER_PIN 12
+#define PASSIVE_BUZZER_PIN 8
+
+// Push Buttons
+#define BUTTON_A_PIN 9
+#define BUTTON_B_PIN 8
+#define BUTTON_LED_PIN 5
+
+// ===============================================================================
+// GLOBAL OBJECTS AND VARIABLES
+// ===============================================================================
+
+// Component instances
+SR04 ultrasonicSensor = SR04(ECHO_PIN, TRIG_PIN);
+DHT_nonblocking dhtSensor(DHT_SENSOR_PIN, DHT_SENSOR_TYPE);
+IRrecv irReceiver(IR_RECEIVER_PIN);
+LedControl ledMatrix = LedControl(LED_MATRIX_DATA_PIN, LED_MATRIX_CLK_PIN, LED_MATRIX_CS_PIN, 1);
+DS3231 rtcClock;
+MFRC522 rfidReader(RFID_SS_PIN, RFID_RST_PIN);
+LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
+Stepper stepperMotor(STEPPER_STEPS, STEPPER_PIN1, STEPPER_PIN3, STEPPER_PIN2, STEPPER_PIN4);
+Servo servoMotor;
+
+// Keypad configuration
+char hexaKeys[4][4] = {
+    {'1', '2', '3', 'A'}, {'4', '5', '6', 'B'}, {'7', '8', '9', 'C'}, {'*', '0', '#', 'D'}};
+Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, 4, 4);
+
+// Seven segment patterns
+byte sevenSegDigits[10] = {
+    B11111100, // 0
+    B01100000, // 1
+    B11011010, // 2
+    B11110010, // 3
+    B01100110, // 4
+    B10110110, // 5
+    B10111110, // 6
+    B11100000, // 7
+    B11111110, // 8
+    B11100110  // 9
+};
+
+// Global variables
+uint32_t lastIRCode = 0;
+unsigned long lastSensorRead = 0;
+RTCDateTime currentTime;
+byte shiftRegisterLEDs = 0;
+
+// ===============================================================================
+// SETUP FUNCTION
+// ===============================================================================
+void setup() {
+    Serial.begin(9600);
+    Serial.println("Arduino Sensor Library Initialized");
+    Serial.println("===================================");
+
+    // Initialize components (uncomment as needed)
+    initializeUltrasonic();
+    initializeKeypad();
+    initializeDHT();
+    initializeJoystick();
+    initializeIR();
+    initializeLEDMatrix();
+    initializeMPU6050();
+    initializePIR();
+    initializePhotoresistor();
+    initializeRTC();
+    initializeSoundSensor();
+    initializeRFID();
+    initializeLCD();
+    initializeShiftRegister();
+    initializeSevenSegment();
+    initializeMotor();
+    initializeStepper();
+    initializeRGB();
+    initializeServo();
+    initializeBuzzer();
+    initializeButtons();
+
+    Serial.println("All components initialized!");
+    delay(2000);
+}
+
+// ===============================================================================
+// MAIN LOOP
+// ===============================================================================
+void loop() {
+    // Example usage - uncomment functions you want to run
+
+    // Sensor readings
+    // readUltrasonic();
+    // readKeypad();
+    // readDHT();
+    // readJoystick();
+    // readIR();
+    // readMPU6050();
+    // readPIR();
+    // readPhotoresistor();
+    // readSoundSensor();
+    // readRFID();
+
+    // Display functions
+    // updateLCD();
+    // updateSevenSegment();
+    // displayLEDMatrix();
+
+    // Control functions
+    // controlRGB();
+    // controlServo();
+    // controlStepper();
+    // controlMotor();
+
+    // Sound functions
+    // playBuzzer();
+    // playMelody();
+
+    delay(100); // Small delay to prevent overwhelming the serial monitor
+}
+
+// ===============================================================================
+// INITIALIZATION FUNCTIONS
+// ===============================================================================
+
+void initializeUltrasonic() {
+    Serial.println("Initializing Ultrasonic Sensor...");
+    // No special initialization needed for SR04 library
+}
+
+void initializeKeypad() {
+    Serial.println("Initializing Keypad...");
+    // No special initialization needed for Keypad library
+}
+
+void initializeDHT() {
+    Serial.println("Initializing DHT11 Sensor...");
+    // DHT sensor initializes automatically
+}
+
+void initializeJoystick() {
+    Serial.println("Initializing Joystick...");
+    pinMode(SW_PIN, INPUT);
+    digitalWrite(SW_PIN, HIGH); // Enable pull-up resistor
+}
+
+void initializeIR() {
+    Serial.println("Initializing IR Receiver...");
+    irReceiver.enableIRIn();
+}
+
+void initializeLEDMatrix() {
+    Serial.println("Initializing LED Matrix...");
+    ledMatrix.shutdown(0, false);
+    ledMatrix.setIntensity(0, 8);
+    ledMatrix.clearDisplay(0);
+}
+
+void initializeMPU6050() {
+    Serial.println("Initializing MPU6050...");
+    Wire.begin();
+    Wire.beginTransmission(MPU_ADDR);
+    Wire.write(0x6B);
+    Wire.write(0);
+    Wire.endTransmission(true);
+}
+
+void initializePIR() {
+    Serial.println("Initializing PIR Sensor...");
+    pinMode(PIR_LED_PIN, OUTPUT);
+    pinMode(PIR_PIN, INPUT);
+    digitalWrite(PIR_LED_PIN, LOW);
+}
+
+void initializePhotoresistor() {
+    Serial.println("Initializing Photoresistor...");
+    // No special initialization needed
+}
+
+void initializeRTC() {
+    Serial.println("Initializing RTC Clock...");
+    rtcClock.begin();
+    // Uncomment to set time manually
+    // rtcClock.setDateTime(2025, 1, 1, 12, 0, 0);
+}
+
+void initializeSoundSensor() {
+    Serial.println("Initializing Sound Sensor...");
+    pinMode(SOUND_DIGITAL_PIN, INPUT);
+    pinMode(SOUND_LED_PIN, OUTPUT);
+}
+
+void initializeRFID() {
+    Serial.println("Initializing RFID Reader...");
+    SPI.begin();
+    rfidReader.PCD_Init();
+}
+
+void initializeLCD() {
+    Serial.println("Initializing LCD Display...");
+    lcd.begin(16, 2);
+    lcd.print("Arduino Library");
+    lcd.setCursor(0, 1);
+    lcd.print("Ready!");
+}
+
+void initializeShiftRegister() {
+    Serial.println("Initializing Shift Register...");
+    pinMode(SHIFT_LATCH_PIN, OUTPUT);
+    pinMode(SHIFT_DATA_PIN, OUTPUT);
+    pinMode(SHIFT_CLOCK_PIN, OUTPUT);
+}
+
+void initializeSevenSegment() {
+    Serial.println("Initializing Seven Segment Display...");
+    pinMode(SEVEN_SEG_LATCH_PIN, OUTPUT);
+    pinMode(SEVEN_SEG_CLOCK_PIN, OUTPUT);
+    pinMode(SEVEN_SEG_DATA_PIN, OUTPUT);
+}
+
+void initializeMotor() {
+    Serial.println("Initializing DC Motor...");
+    pinMode(MOTOR_ENABLE_PIN, OUTPUT);
+    pinMode(MOTOR_DIR_A_PIN, OUTPUT);
+    pinMode(MOTOR_DIR_B_PIN, OUTPUT);
+}
+
+void initializeStepper() {
+    Serial.println("Initializing Stepper Motor...");
+    stepperMotor.setSpeed(15);
+}
+
+void initializeRGB() {
+    Serial.println("Initializing RGB LED...");
+    pinMode(RGB_RED_PIN, OUTPUT);
+    pinMode(RGB_GREEN_PIN, OUTPUT);
+    pinMode(RGB_BLUE_PIN, OUTPUT);
+}
+
+void initializeServo() {
+    Serial.println("Initializing Servo Motor...");
+    servoMotor.attach(SERVO_PIN);
+}
+
+void initializeBuzzer() {
+    Serial.println("Initializing Buzzer...");
+    pinMode(BUZZER_PIN, OUTPUT);
+}
+
+void initializeButtons() {
+    Serial.println("Initializing Buttons...");
+    pinMode(BUTTON_LED_PIN, OUTPUT);
+    pinMode(BUTTON_A_PIN, INPUT_PULLUP);
+    pinMode(BUTTON_B_PIN, INPUT_PULLUP);
+}
+
+// ===============================================================================
+// SENSOR READING FUNCTIONS
+// ===============================================================================
+
+long readUltrasonic() {
+    long distance = ultrasonicSensor.Distance();
+    Serial.print("Distance: ");
+    Serial.print(distance);
+    Serial.println(" cm");
+    return distance;
+}
+
+char readKeypad() {
+    char key = customKeypad.getKey();
+    if (key) {
+        Serial.print("Key pressed: ");
+        Serial.println(key);
+    }
+    return key;
+}
+
+bool readDHT(float *temperature, float *humidity) {
+    static unsigned long measurementTimestamp = millis();
+
+    if (millis() - measurementTimestamp > 3000ul) {
+        if (dhtSensor.measure(temperature, humidity)) {
+            measurementTimestamp = millis();
+            Serial.print("Temperature: ");
+            Serial.print(*temperature, 1);
+            Serial.print("°C, Humidity: ");
+            Serial.print(*humidity, 1);
+            Serial.println("%");
+            return true;
+        }
+    }
+    return false;
+}
+
+void readJoystick() {
+    int switchState = digitalRead(SW_PIN);
+    int xValue = analogRead(X_PIN);
+    int yValue = analogRead(Y_PIN);
+
+    Serial.print("Switch: ");
+    Serial.print(switchState);
+    Serial.print(", X: ");
+    Serial.print(xValue);
+    Serial.print(", Y: ");
+    Serial.println(yValue);
+}
+
+uint32_t readIR() {
+    if (irReceiver.decode()) {
+        if (irReceiver.decodedIRData.flags) {
+            irReceiver.decodedIRData.decodedRawData = lastIRCode;
+        }
+
+        uint32_t code = irReceiver.decodedIRData.decodedRawData;
+        Serial.print("IR Code: 0x");
+        Serial.println(code, HEX);
+
+        // Decode common remote buttons
+        decodeIRButton(code);
+
+        lastIRCode = code;
+        irReceiver.resume();
+        return code;
+    }
+    return 0;
+}
+
+void readMPU6050() {
+    int16_t AcX, AcY, AcZ, Tmp, GyX, GyY, GyZ;
+
+    Wire.beginTransmission(MPU_ADDR);
+    Wire.write(0x3B);
+    Wire.endTransmission(false);
+    Wire.requestFrom(MPU_ADDR, 14, true);
+
+    AcX = Wire.read() << 8 | Wire.read();
+    AcY = Wire.read() << 8 | Wire.read();
+    AcZ = Wire.read() << 8 | Wire.read();
+    Tmp = Wire.read() << 8 | Wire.read();
+    GyX = Wire.read() << 8 | Wire.read();
+    GyY = Wire.read() << 8 | Wire.read();
+    GyZ = Wire.read() << 8 | Wire.read();
+
+    Serial.print("AcX: ");
+    Serial.print(AcX);
+    Serial.print(" | AcY: ");
+    Serial.print(AcY);
+    Serial.print(" | AcZ: ");
+    Serial.print(AcZ);
+    Serial.print(" | Temp: ");
+    Serial.print(Tmp / 340.00 + 36.53);
+    Serial.print(" | GyX: ");
+    Serial.print(GyX);
+    Serial.print(" | GyY: ");
+    Serial.print(GyY);
+    Serial.print(" | GyZ: ");
+    Serial.println(GyZ);
+}
+
+bool readPIR() {
+    int pirValue = digitalRead(PIR_PIN);
+    digitalWrite(PIR_LED_PIN, pirValue);
+    if (pirValue) {
+        Serial.println("Motion detected!");
+    }
+    return pirValue;
+}
+
+int readPhotoresistor() {
+    static int historyValue = 0;
+    int value = analogRead(PHOTO_PIN);
+
+    if (abs(value - historyValue) > 10) {
+        Serial.print("Light level: ");
+        Serial.println(value);
+        historyValue = value;
+    }
+    return value;
+}
+
+void readSoundSensor() {
+    int analogValue = analogRead(SOUND_ANALOG_PIN);
+    int digitalValue = digitalRead(SOUND_DIGITAL_PIN);
+
+    Serial.print("Sound Level: ");
+    Serial.println(analogValue);
+
+    digitalWrite(SOUND_LED_PIN, digitalValue);
+}
+
+bool readRFID() {
+    if (!rfidReader.PICC_IsNewCardPresent() || !rfidReader.PICC_ReadCardSerial()) {
+        return false;
+    }
+
+    Serial.print("Card UID:");
+    for (byte i = 0; i < rfidReader.uid.size; i++) {
+        Serial.print(rfidReader.uid.uidByte[i] < 0x10 ? " 0" : " ");
+        Serial.print(rfidReader.uid.uidByte[i], HEX);
+    }
+    Serial.println();
+
+    rfidReader.PICC_HaltA();
+    return true;
+}
+
+void readButtons() {
+    if (digitalRead(BUTTON_A_PIN) == LOW) {
+        digitalWrite(BUTTON_LED_PIN, HIGH);
+        Serial.println("Button A pressed");
+    }
+    if (digitalRead(BUTTON_B_PIN) == LOW) {
+        digitalWrite(BUTTON_LED_PIN, LOW);
+        Serial.println("Button B pressed");
+    }
+}
+
+// ===============================================================================
+// DISPLAY AND OUTPUT FUNCTIONS
+// ===============================================================================
+
+void updateLCD() {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Time: ");
+
+    currentTime = rtcClock.getDateTime();
+    lcd.print(currentTime.hour);
+    lcd.print(":");
+    lcd.print(currentTime.minute);
+
+    lcd.setCursor(0, 1);
+    lcd.print("Temp: ");
+
+    float temp, humidity;
+    if (readDHT(&temp, &humidity)) {
+        lcd.print(temp, 1);
+        lcd.print("C");
+    }
+}
+
+void updateShiftRegister() {
+    digitalWrite(SHIFT_LATCH_PIN, LOW);
+    shiftOut(SHIFT_DATA_PIN, SHIFT_CLOCK_PIN, LSBFIRST, shiftRegisterLEDs);
+    digitalWrite(SHIFT_LATCH_PIN, HIGH);
+}
+
+void setShiftRegisterLED(int ledNumber, bool state) {
+    if (ledNumber >= 0 && ledNumber <= 7) {
+        if (state) {
+            bitSet(shiftRegisterLEDs, ledNumber);
+        } else {
+            bitClear(shiftRegisterLEDs, ledNumber);
+        }
+        updateShiftRegister();
+    }
+}
+
+void updateSevenSegment(int digit) {
+    if (digit >= 0 && digit <= 9) {
+        digitalWrite(SEVEN_SEG_LATCH_PIN, LOW);
+        shiftOut(SEVEN_SEG_DATA_PIN, SEVEN_SEG_CLOCK_PIN, LSBFIRST, sevenSegDigits[digit]);
+        digitalWrite(SEVEN_SEG_LATCH_PIN, HIGH);
+    }
+}
+
+void displayLEDMatrix() {
+    // Display "Arduino" text pattern
+    byte a[5] = {B01111110, B10001000, B10001000, B10001000, B01111110};
+
+    for (int i = 0; i < 5; i++) {
+        ledMatrix.setRow(0, i, a[i]);
+    }
+    delay(1000);
+    ledMatrix.clearDisplay(0);
+}
+
+// ===============================================================================
+// MOTOR AND ACTUATOR CONTROL FUNCTIONS
+// ===============================================================================
+
+void controlMotor(int speed, bool direction) {
+    analogWrite(MOTOR_ENABLE_PIN, abs(speed));
+
+    if (direction) {
+        digitalWrite(MOTOR_DIR_A_PIN, HIGH);
+        digitalWrite(MOTOR_DIR_B_PIN, LOW);
+    } else {
+        digitalWrite(MOTOR_DIR_A_PIN, LOW);
+        digitalWrite(MOTOR_DIR_B_PIN, HIGH);
+    }
+}
+
+void stopMotor() {
+    digitalWrite(MOTOR_ENABLE_PIN, LOW);
+}
+
+void controlStepper(int steps) {
+    stepperMotor.step(steps);
+    // Turn off motor coils to save power
+    digitalWrite(STEPPER_PIN1, LOW);
+    digitalWrite(STEPPER_PIN2, LOW);
+    digitalWrite(STEPPER_PIN3, LOW);
+    digitalWrite(STEPPER_PIN4, LOW);
+}
+
+void controlServo(int angle) {
+    if (angle >= 0 && angle <= 180) {
+        servoMotor.write(angle);
+    }
+}
+
+void sweepServo() {
+    for (int angle = 0; angle <= 180; angle++) {
+        servoMotor.write(angle);
+        delay(10);
+    }
+    for (int angle = 180; angle >= 0; angle--) {
+        servoMotor.write(angle);
+        delay(10);
+    }
+}
+
+// ===============================================================================
+// RGB LED CONTROL FUNCTIONS
+// ===============================================================================
+
+void setRGBColor(int red, int green, int blue) {
+    analogWrite(RGB_RED_PIN, red);
+    analogWrite(RGB_GREEN_PIN, green);
+    analogWrite(RGB_BLUE_PIN, blue);
+}
+
+void controlRGB() {
+    // Color cycling animation
+    for (int i = 0; i < 255; i++) {
+        setRGBColor(255 - i, i, 0); // Red to Green
+        delay(10);
+    }
+    for (int i = 0; i < 255; i++) {
+        setRGBColor(0, 255 - i, i); // Green to Blue
+        delay(10);
+    }
+    for (int i = 0; i < 255; i++) {
+        setRGBColor(i, 0, 255 - i); // Blue to Red
+        delay(10);
+    }
+}
+
+// ===============================================================================
+// SOUND FUNCTIONS
+// ===============================================================================
+
+void playBuzzer(int duration) {
+    digitalWrite(BUZZER_PIN, HIGH);
+    delay(duration);
+    digitalWrite(BUZZER_PIN, LOW);
+}
+
+void playMelody() {
+    int melody[] = {262, 294, 330, 349, 392, 440, 494, 523}; // C major scale
+    int duration = 500;
+
+    for (int i = 0; i < 8; i++) {
+        tone(PASSIVE_BUZZER_PIN, melody[i], duration);
+        delay(600);
+    }
+}
+
+void playAlarm() {
+    for (int i = 0; i < 10; i++) {
+        digitalWrite(BUZZER_PIN, HIGH);
+        delay(100);
+        digitalWrite(BUZZER_PIN, LOW);
+        delay(100);
+    }
+}
+
+// ===============================================================================
+// UTILITY FUNCTIONS
+// ===============================================================================
+
+void decodeIRButton(uint32_t code) {
+    switch (code) {
+    case 0xBA45FF00:
+        Serial.println("POWER");
+        break;
+    case 0xB847FF00:
+        Serial.println("FUNC/STOP");
+        break;
+    case 0xB946FF00:
+        Serial.println("VOL+");
+        break;
+    case 0xBB44FF00:
+        Serial.println("FAST BACK");
+        break;
+    case 0xBF40FF00:
+        Serial.println("PAUSE");
+        break;
+    case 0xBC43FF00:
+        Serial.println("FAST FORWARD");
+        break;
+    case 0xF807FF00:
+        Serial.println("DOWN");
+        break;
+    case 0xEA15FF00:
+        Serial.println("VOL-");
+        break;
+    case 0xF609FF00:
+        Serial.println("UP");
+        break;
+    case 0xE619FF00:
+        Serial.println("EQ");
+        break;
+    case 0xF20DFF00:
+        Serial.println("ST/REPT");
+        break;
+    case 0xE916FF00:
+        Serial.println("0");
+        break;
+    case 0xF30CFF00:
+        Serial.println("1");
+        break;
+    case 0xE718FF00:
+        Serial.println("2");
+        break;
+    case 0xA15EFF00:
+        Serial.println("3");
+        break;
+    case 0xF708FF00:
+        Serial.println("4");
+        break;
+    case 0xE31CFF00:
+        Serial.println("5");
+        break;
+    case 0xA55AFF00:
+        Serial.println("6");
+        break;
+    case 0xBD42FF00:
+        Serial.println("7");
+        break;
+    case 0xAD52FF00:
+        Serial.println("8");
+        break;
+    case 0xB54AFF00:
+        Serial.println("9");
+        break;
+    default:
+        Serial.println("Unknown button");
+        break;
+    }
+}
+
+void printTime() {
+    currentTime = rtcClock.getDateTime();
+    Serial.print("Current time: ");
+    Serial.print(currentTime.year);
+    Serial.print("-");
+    Serial.print(currentTime.month);
+    Serial.print("-");
+    Serial.print(currentTime.day);
+    Serial.print(" ");
+    Serial.print(currentTime.hour);
+    Serial.print(":");
+    Serial.print(currentTime.minute);
+    Serial.print(":");
+    Serial.println(currentTime.second);
+}
+
+void lightMeter() {
+    int lightLevel = readPhotoresistor();
+    int numLEDs = lightLevel / 128; // Scale to 0-8 LEDs
+
+    shiftRegisterLEDs = 0;
+    for (int i = 0; i < numLEDs; i++) {
+        bitSet(shiftRegisterLEDs, i);
+    }
+    updateShiftRegister();
+}
+
+// ===============================================================================
+// ADVANCED CONTROL FUNCTIONS
+// ===============================================================================
+
+void demoMode() {
+    Serial.println("Starting Demo Mode...");
+
+    // RGB LED demo
+    Serial.println("RGB LED Demo");
+    controlRGB();
+
+    // Servo sweep demo
+    Serial.println("Servo Demo");
+    sweepServo();
+
+    // Buzzer demo
+    Serial.println("Buzzer Demo");
+    playMelody();
+
+    // LED Matrix demo
+    Serial.println("LED Matrix Demo");
+    displayLEDMatrix();
+
+    // Seven segment counter
+    Serial.println("Seven Segment Counter");
+    for (int i = 0; i < 10; i++) {
+        updateSevenSegment(i);
+        delay(500);
+    }
+
+    Serial.println("Demo complete!");
+}
+
+void automaticLighting() {
+    int lightLevel = analogRead(PHOTO_PIN);
+
+    if (lightLevel < 300) {
+        // Dark - turn on LED
+        setShiftRegisterLED(0, true);
+        setRGBColor(255, 255, 255); // White light
+    } else {
+        // Bright - turn off LED
+        setShiftRegisterLED(0, false);
+        setRGBColor(0, 0, 0);
+    }
+}
+
+void securitySystem() {
+    static bool armed = false;
+    static unsigned long lastMotion = 0;
+
+    // Check for arming/disarming via keypad
+    char key = readKeypad();
+    if (key == 'A') {
+        armed = !armed;
+        Serial.print("Security system ");
+        Serial.println(armed ? "ARMED" : "DISARMED");
+        playBuzzer(100);
+    }
+
+    if (armed) {
+        if (readPIR()) {
+            if (millis() - lastMotion > 5000) { // 5 second cooldown
+                Serial.println("SECURITY ALERT: Motion detected!");
+                playAlarm();
+                setRGBColor(255, 0, 0); // Red alert
+                lastMotion = millis();
+            }
+        }
+    }
+}
+
+// ===============================================================================
+// END OF LIBRARY
+// ===============================================================================
+
+/*
+ * USAGE EXAMPLES:
+ *
+ * In loop(), you can call any of these functions:
+ *
+ * // Read sensors
+ * long distance = readUltrasonic();
+ * char key = readKeypad();
+ * float temp, humidity;
+ * bool dhtSuccess = readDHT(&temp, &humidity);
+ *
+ * // Control outputs
+ * setRGBColor(255, 0, 0);  // Red
+ * controlServo(90);         // 90 degrees
+ * playBuzzer(500);         // 500ms beep
+ * updateSevenSegment(5);   // Display "5"
+ *
+ * // Run demos
+ * demoMode();              // Full demonstration
+ * automaticLighting();     // Light-sensitive LED
+ * securitySystem();        // Motion-activated alarm
+ *
+ * REQUIRED ADDITIONAL FILES:
+ * - pitches.h (for musical notes)
+ * - All the required libraries installed in Arduino IDE
+ *
+ * WIRING:
+ * Follow the pin definitions at the top of this file.
+ * Adjust pins as needed for your specific setup.
+ */
