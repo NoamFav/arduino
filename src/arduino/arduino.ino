@@ -1,928 +1,522 @@
-/*
- * ===============================================================================
- * COMPLETE ARDUINO SENSOR LIBRARY
- * ===============================================================================
- * A comprehensive library combining multiple sensors and components
- * Based on Elegoo examples and enhanced with modular functions
- *
- * Author: Arduino Community / Elegoo
- * Modified: Enhanced with modular structure and documentation
- * Date: 2025
- *
- * SUPPORTED COMPONENTS:
- * - Ultrasonic Sensor (HC-SR04)
- * - Keypad (4x4)
- * - DHT11 Temperature/Humidity Sensor
- * - Joystick
- * - IR Remote Receiver
- * - LED Matrix (MAX7219)
- * - MPU6050 Accelerometer/Gyroscope
- * - PIR Motion Sensor
- * - Photoresistor
- * - DS3231 RTC Clock
- * - Sound Sensor
- * - RFID (MFRC522)
- * - LCD Display (16x2)
- * - Shift Register (74HC595)
- * - Seven Segment Display
- * - DC Motor Control
- * - Stepper Motor
- * - RGB LED
- * - Servo Motor
- * - Active/Passive Buzzer
- *
- * USAGE:
- * 1. Uncomment the components you want to use in the setup() function
- * 2. Call the respective functions in loop() or as needed
- * 3. Adjust pin definitions as needed for your wiring
- * ===============================================================================
- */
+// EDMO 2-DoF planar arm: Enhanced controller with improved safety, diagnostics, and features
+// Commands (Serial @ 9600, "Newline"):
+//   ANG a1,a2    -- or simply "a1,a2" (degrees)  -> direct servo set
+//   IK  x y [U|D] -- x,y in cm; U=elbow-up, D=elbow-down (default D)
+//   HOME         -- move to home position (0,0)
+//   STATUS       -- show current position and servo info
+//   LIMITS       -- show workspace limits
+//   SMOOTH speed -- set movement speed (1-10, 5=default)
+//   HELP         -- show command help
 
-// ===============================================================================
-// LIBRARY INCLUDES
-// ===============================================================================
-#include "IRremote.h"        // IR receiver
-#include "LedControl.h"      // LED Matrix
-#include "SR04.h"            // Ultrasonic sensor
-#include "pitches.h"         // Musical notes (you'll need to create this file)
-#include <DS3231.h>          // RTC clock
-#include <Keypad.h>          // 4x4 Keypad
-#include <LiquidCrystal.h>   // LCD display
-#include <MFRC522.h>         // RFID
-#include <SPI.h>             // SPI communication
-#include <Servo.h>           // Servo motor
-#include <Stepper.h>         // Stepper motor
-#include <Wire.h>            // I2C communication
-#include <dht_nonblocking.h> // DHT11 sensor
+#include <Adafruit_PWMServoDriver.h>
+#include <Servo.h>
+#include <Wire.h>
+#include <ctype.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
-// ===============================================================================
-// PIN DEFINITIONS
-// ===============================================================================
+// ---------- Configuration ----------
+#define NUM_MOTORS 2
+#define LEFTEND -90 // allowed user angle range (deg)
+#define RIGHTEND 90
+#define MAX_SPEED 10 // movement speed levels
+#define DEFAULT_SPEED 5
+#define POSITION_TOLERANCE 0.5f // degrees
 
-// Ultrasonic Sensor (HC-SR04)
-#define TRIG_PIN 12
-#define ECHO_PIN 11
+// Servo PWM limits (from EDMO specifications)
+const int SERVOMIN[2] = {78, 78};   // ch0, ch1  (0..4095)
+const int SERVOMAX[2] = {472, 494}; // ch0, ch1
 
-// Keypad pins
-byte rowPins[4] = {9, 8, 7, 6};
-byte colPins[4] = {5, 4, 3, 2};
+// Choose your EDMO generation
+#define EDMO_GEN 2 // set 1 for old EDMO, 2 for EDMO 2.0
 
-// DHT11 sensor
-#define DHT_SENSOR_PIN 2
-#define DHT_SENSOR_TYPE DHT_TYPE_11
+#if (EDMO_GEN == 1)
+// Old EDMO (slides)
+const float L1 = 5.40f;  // cm
+const float L2 = 10.40f; // cm
+const float L3 = 5.00f;  // cm
+#else
+// EDMO 2.0 (slides)
+const float L1 = 6.65f;  // cm
+const float L2 = 13.30f; // cm
+const float L3 = 6.65f;  // cm
+#endif
 
-// Joystick pins
-#define SW_PIN 2
-#define X_PIN 0
-#define Y_PIN 1
+// Effective 2nd segment assumes tip L3 colinear with link-2
+const float RSEG = L2 + L3;
 
-// IR Receiver
-#define IR_RECEIVER_PIN 11
+// Servo ↔️ kinematics angle mapping
+// θj = THETA_ZERO[j] + SGN[j] * αj   (degrees)
+float THETA_ZERO[2] = {90.0f, 0.0f}; // adjust if your neutral differs
+int SGN[2] = {+1, -1};               // flip sign if a joint turns opposite
 
-// LED Matrix (MAX7219)
-#define LED_MATRIX_DATA_PIN 12
-#define LED_MATRIX_CLK_PIN 10
-#define LED_MATRIX_CS_PIN 11
+// ---------- Global Variables ----------
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 
-// MPU6050 I2C address
-#define MPU_ADDR 0x68
+// State variables
+float currentAngles[NUM_MOTORS] = {0.0f, 0.0f}; // current α1, α2 (deg)
+float targetAngles[NUM_MOTORS] = {0.0f, 0.0f};  // target α1, α2 (deg)
+int pwmValues[NUM_MOTORS] = {0, 0};             // current PWM values
+int movementSpeed = DEFAULT_SPEED;              // movement speed (1-10)
+bool isMoving = false;                          // movement state flag
 
-// PIR Motion Sensor
-#define PIR_PIN 7
-#define PIR_LED_PIN 13
+// Communication buffers
+char inputBuffer[100];
+int bufferIndex = 0;
+unsigned long lastMoveTime = 0;
+const unsigned long MOVE_INTERVAL = 20; // ms between smooth movement steps
 
-// Photoresistor
-#define PHOTO_PIN 0
+// Error tracking
+int errorCount = 0;
+unsigned long lastErrorTime = 0;
 
-// Sound Sensor
-#define SOUND_ANALOG_PIN A0
-#define SOUND_DIGITAL_PIN 3
-#define SOUND_LED_PIN 13
-
-// RFID (MFRC522)
-#define RFID_RST_PIN 5
-#define RFID_SS_PIN 53
-
-// LCD Display
-#define LCD_RS 7
-#define LCD_EN 8
-#define LCD_D4 9
-#define LCD_D5 10
-#define LCD_D6 11
-#define LCD_D7 12
-
-// Shift Register (74HC595)
-#define SHIFT_LATCH_PIN 11
-#define SHIFT_CLOCK_PIN 9
-#define SHIFT_DATA_PIN 12
-
-// Seven Segment Display
-#define SEVEN_SEG_LATCH_PIN 3
-#define SEVEN_SEG_CLOCK_PIN 4
-#define SEVEN_SEG_DATA_PIN 2
-
-// Motor Control (L293D)
-#define MOTOR_ENABLE_PIN 5
-#define MOTOR_DIR_A_PIN 3
-#define MOTOR_DIR_B_PIN 4
-
-// Stepper Motor
-#define STEPPER_STEPS 2048
-#define STEPPER_PIN1 8
-#define STEPPER_PIN2 10
-#define STEPPER_PIN3 9
-#define STEPPER_PIN4 11
-
-// RGB LED
-#define RGB_RED_PIN 6
-#define RGB_GREEN_PIN 5
-#define RGB_BLUE_PIN 3
-
-// Servo Motor
-#define SERVO_PIN 9
-
-// Buzzer
-#define BUZZER_PIN 12
-#define PASSIVE_BUZZER_PIN 8
-
-// Push Buttons
-#define BUTTON_A_PIN 9
-#define BUTTON_B_PIN 8
-#define BUTTON_LED_PIN 5
-
-// ===============================================================================
-// GLOBAL OBJECTS AND VARIABLES
-// ===============================================================================
-
-// Component instances
-SR04 ultrasonicSensor = SR04(ECHO_PIN, TRIG_PIN);
-DHT_nonblocking dhtSensor(DHT_SENSOR_PIN, DHT_SENSOR_TYPE);
-IRrecv irReceiver(IR_RECEIVER_PIN);
-LedControl ledMatrix = LedControl(LED_MATRIX_DATA_PIN, LED_MATRIX_CLK_PIN, LED_MATRIX_CS_PIN, 1);
-DS3231 rtcClock;
-MFRC522 rfidReader(RFID_SS_PIN, RFID_RST_PIN);
-LiquidCrystal lcd(LCD_RS, LCD_EN, LCD_D4, LCD_D5, LCD_D6, LCD_D7);
-Stepper stepperMotor(STEPPER_STEPS, STEPPER_PIN1, STEPPER_PIN3, STEPPER_PIN2, STEPPER_PIN4);
-Servo servoMotor;
-
-// Keypad configuration
-char hexaKeys[4][4] = {
-    {'1', '2', '3', 'A'}, {'4', '5', '6', 'B'}, {'7', '8', '9', 'C'}, {'*', '0', '#', 'D'}};
-Keypad customKeypad = Keypad(makeKeymap(hexaKeys), rowPins, colPins, 4, 4);
-
-// Seven segment patterns
-byte sevenSegDigits[10] = {
-    B11111100, // 0
-    B01100000, // 1
-    B11011010, // 2
-    B11110010, // 3
-    B01100110, // 4
-    B10110110, // 5
-    B10111110, // 6
-    B11100000, // 7
-    B11111110, // 8
-    B11100110  // 9
-};
-
-// Global variables
-uint32_t lastIRCode = 0;
-unsigned long lastSensorRead = 0;
-RTCDateTime currentTime;
-byte shiftRegisterLEDs = 0;
-
-// ===============================================================================
-// SETUP FUNCTION
-// ===============================================================================
-void setup() {
-    Serial.begin(9600);
-    Serial.println("Arduino Sensor Library Initialized");
-    Serial.println("===================================");
-
-    // Initialize components (uncomment as needed)
-    initializeUltrasonic();
-    initializeKeypad();
-    initializeDHT();
-    initializeJoystick();
-    initializeIR();
-    initializeLEDMatrix();
-    initializeMPU6050();
-    initializePIR();
-    initializePhotoresistor();
-    initializeRTC();
-    initializeSoundSensor();
-    initializeRFID();
-    initializeLCD();
-    initializeShiftRegister();
-    initializeSevenSegment();
-    initializeMotor();
-    initializeStepper();
-    initializeRGB();
-    initializeServo();
-    initializeBuzzer();
-    initializeButtons();
-
-    Serial.println("All components initialized!");
-    delay(2000);
+// ---------- Utility Functions ----------
+static inline float deg2rad(float d) {
+    return d * 0.017453292519943295f;
 }
 
-// ===============================================================================
-// MAIN LOOP
-// ===============================================================================
-void loop() {
-    // Example usage - uncomment functions you want to run
-
-    // Sensor readings
-    // readUltrasonic();
-    // readKeypad();
-    // readDHT();
-    // readJoystick();
-    // readIR();
-    // readMPU6050();
-    // readPIR();
-    // readPhotoresistor();
-    // readSoundSensor();
-    // readRFID();
-
-    // Display functions
-    // updateLCD();
-    // updateSevenSegment();
-    // displayLEDMatrix();
-
-    // Control functions
-    // controlRGB();
-    // controlServo();
-    // controlStepper();
-    // controlMotor();
-
-    // Sound functions
-    // playBuzzer();
-    // playMelody();
-
-    delay(100); // Small delay to prevent overwhelming the serial monitor
+static inline float rad2deg(float r) {
+    return r * 57.29577951308232f;
 }
 
-// ===============================================================================
-// INITIALIZATION FUNCTIONS
-// ===============================================================================
-
-void initializeUltrasonic() {
-    Serial.println("Initializing Ultrasonic Sensor...");
-    // No special initialization needed for SR04 library
+static inline float clampf(float v, float lo, float hi) {
+    return v < lo ? lo : (v > hi ? hi : v);
 }
 
-void initializeKeypad() {
-    Serial.println("Initializing Keypad...");
-    // No special initialization needed for Keypad library
+static inline float absf(float x) {
+    return x < 0 ? -x : x;
 }
 
-void initializeDHT() {
-    Serial.println("Initializing DHT11 Sensor...");
-    // DHT sensor initializes automatically
+// Linear interpolation
+float lerp(float a, float b, float t) {
+    return a + t * (b - a);
 }
 
-void initializeJoystick() {
-    Serial.println("Initializing Joystick...");
-    pinMode(SW_PIN, INPUT);
-    digitalWrite(SW_PIN, HIGH); // Enable pull-up resistor
-}
-
-void initializeIR() {
-    Serial.println("Initializing IR Receiver...");
-    irReceiver.enableIRIn();
-}
-
-void initializeLEDMatrix() {
-    Serial.println("Initializing LED Matrix...");
-    ledMatrix.shutdown(0, false);
-    ledMatrix.setIntensity(0, 8);
-    ledMatrix.clearDisplay(0);
-}
-
-void initializeMPU6050() {
-    Serial.println("Initializing MPU6050...");
-    Wire.begin();
-    Wire.beginTransmission(MPU_ADDR);
-    Wire.write(0x6B);
-    Wire.write(0);
-    Wire.endTransmission(true);
-}
-
-void initializePIR() {
-    Serial.println("Initializing PIR Sensor...");
-    pinMode(PIR_LED_PIN, OUTPUT);
-    pinMode(PIR_PIN, INPUT);
-    digitalWrite(PIR_LED_PIN, LOW);
-}
-
-void initializePhotoresistor() {
-    Serial.println("Initializing Photoresistor...");
-    // No special initialization needed
-}
-
-void initializeRTC() {
-    Serial.println("Initializing RTC Clock...");
-    rtcClock.begin();
-    // Uncomment to set time manually
-    // rtcClock.setDateTime(2025, 1, 1, 12, 0, 0);
-}
-
-void initializeSoundSensor() {
-    Serial.println("Initializing Sound Sensor...");
-    pinMode(SOUND_DIGITAL_PIN, INPUT);
-    pinMode(SOUND_LED_PIN, OUTPUT);
-}
-
-void initializeRFID() {
-    Serial.println("Initializing RFID Reader...");
-    SPI.begin();
-    rfidReader.PCD_Init();
-}
-
-void initializeLCD() {
-    Serial.println("Initializing LCD Display...");
-    lcd.begin(16, 2);
-    lcd.print("Arduino Library");
-    lcd.setCursor(0, 1);
-    lcd.print("Ready!");
-}
-
-void initializeShiftRegister() {
-    Serial.println("Initializing Shift Register...");
-    pinMode(SHIFT_LATCH_PIN, OUTPUT);
-    pinMode(SHIFT_DATA_PIN, OUTPUT);
-    pinMode(SHIFT_CLOCK_PIN, OUTPUT);
-}
-
-void initializeSevenSegment() {
-    Serial.println("Initializing Seven Segment Display...");
-    pinMode(SEVEN_SEG_LATCH_PIN, OUTPUT);
-    pinMode(SEVEN_SEG_CLOCK_PIN, OUTPUT);
-    pinMode(SEVEN_SEG_DATA_PIN, OUTPUT);
-}
-
-void initializeMotor() {
-    Serial.println("Initializing DC Motor...");
-    pinMode(MOTOR_ENABLE_PIN, OUTPUT);
-    pinMode(MOTOR_DIR_A_PIN, OUTPUT);
-    pinMode(MOTOR_DIR_B_PIN, OUTPUT);
-}
-
-void initializeStepper() {
-    Serial.println("Initializing Stepper Motor...");
-    stepperMotor.setSpeed(15);
-}
-
-void initializeRGB() {
-    Serial.println("Initializing RGB LED...");
-    pinMode(RGB_RED_PIN, OUTPUT);
-    pinMode(RGB_GREEN_PIN, OUTPUT);
-    pinMode(RGB_BLUE_PIN, OUTPUT);
-}
-
-void initializeServo() {
-    Serial.println("Initializing Servo Motor...");
-    servoMotor.attach(SERVO_PIN);
-}
-
-void initializeBuzzer() {
-    Serial.println("Initializing Buzzer...");
-    pinMode(BUZZER_PIN, OUTPUT);
-}
-
-void initializeButtons() {
-    Serial.println("Initializing Buttons...");
-    pinMode(BUTTON_LED_PIN, OUTPUT);
-    pinMode(BUTTON_A_PIN, INPUT_PULLUP);
-    pinMode(BUTTON_B_PIN, INPUT_PULLUP);
-}
-
-// ===============================================================================
-// SENSOR READING FUNCTIONS
-// ===============================================================================
-
-long readUltrasonic() {
-    long distance = ultrasonicSensor.Distance();
-    Serial.print("Distance: ");
-    Serial.print(distance);
-    Serial.println(" cm");
-    return distance;
-}
-
-char readKeypad() {
-    char key = customKeypad.getKey();
-    if (key) {
-        Serial.print("Key pressed: ");
-        Serial.println(key);
-    }
-    return key;
-}
-
-bool readDHT(float *temperature, float *humidity) {
-    static unsigned long measurementTimestamp = millis();
-
-    if (millis() - measurementTimestamp > 3000ul) {
-        if (dhtSensor.measure(temperature, humidity)) {
-            measurementTimestamp = millis();
-            Serial.print("Temperature: ");
-            Serial.print(*temperature, 1);
-            Serial.print("°C, Humidity: ");
-            Serial.print(*humidity, 1);
-            Serial.println("%");
-            return true;
+// ---------- Movement Functions ----------
+bool isAtTarget() {
+    for (int i = 0; i < NUM_MOTORS; i++) {
+        if (absf(currentAngles[i] - targetAngles[i]) > POSITION_TOLERANCE) {
+            return false;
         }
     }
-    return false;
-}
-
-void readJoystick() {
-    int switchState = digitalRead(SW_PIN);
-    int xValue = analogRead(X_PIN);
-    int yValue = analogRead(Y_PIN);
-
-    Serial.print("Switch: ");
-    Serial.print(switchState);
-    Serial.print(", X: ");
-    Serial.print(xValue);
-    Serial.print(", Y: ");
-    Serial.println(yValue);
-}
-
-uint32_t readIR() {
-    if (irReceiver.decode()) {
-        if (irReceiver.decodedIRData.flags) {
-            irReceiver.decodedIRData.decodedRawData = lastIRCode;
-        }
-
-        uint32_t code = irReceiver.decodedIRData.decodedRawData;
-        Serial.print("IR Code: 0x");
-        Serial.println(code, HEX);
-
-        // Decode common remote buttons
-        decodeIRButton(code);
-
-        lastIRCode = code;
-        irReceiver.resume();
-        return code;
-    }
-    return 0;
-}
-
-void readMPU6050() {
-    int16_t AcX, AcY, AcZ, Tmp, GyX, GyY, GyZ;
-
-    Wire.beginTransmission(MPU_ADDR);
-    Wire.write(0x3B);
-    Wire.endTransmission(false);
-    Wire.requestFrom(MPU_ADDR, 14, true);
-
-    AcX = Wire.read() << 8 | Wire.read();
-    AcY = Wire.read() << 8 | Wire.read();
-    AcZ = Wire.read() << 8 | Wire.read();
-    Tmp = Wire.read() << 8 | Wire.read();
-    GyX = Wire.read() << 8 | Wire.read();
-    GyY = Wire.read() << 8 | Wire.read();
-    GyZ = Wire.read() << 8 | Wire.read();
-
-    Serial.print("AcX: ");
-    Serial.print(AcX);
-    Serial.print(" | AcY: ");
-    Serial.print(AcY);
-    Serial.print(" | AcZ: ");
-    Serial.print(AcZ);
-    Serial.print(" | Temp: ");
-    Serial.print(Tmp / 340.00 + 36.53);
-    Serial.print(" | GyX: ");
-    Serial.print(GyX);
-    Serial.print(" | GyY: ");
-    Serial.print(GyY);
-    Serial.print(" | GyZ: ");
-    Serial.println(GyZ);
-}
-
-bool readPIR() {
-    int pirValue = digitalRead(PIR_PIN);
-    digitalWrite(PIR_LED_PIN, pirValue);
-    if (pirValue) {
-        Serial.println("Motion detected!");
-    }
-    return pirValue;
-}
-
-int readPhotoresistor() {
-    static int historyValue = 0;
-    int value = analogRead(PHOTO_PIN);
-
-    if (abs(value - historyValue) > 10) {
-        Serial.print("Light level: ");
-        Serial.println(value);
-        historyValue = value;
-    }
-    return value;
-}
-
-void readSoundSensor() {
-    int analogValue = analogRead(SOUND_ANALOG_PIN);
-    int digitalValue = digitalRead(SOUND_DIGITAL_PIN);
-
-    Serial.print("Sound Level: ");
-    Serial.println(analogValue);
-
-    digitalWrite(SOUND_LED_PIN, digitalValue);
-}
-
-bool readRFID() {
-    if (!rfidReader.PICC_IsNewCardPresent() || !rfidReader.PICC_ReadCardSerial()) {
-        return false;
-    }
-
-    Serial.print("Card UID:");
-    for (byte i = 0; i < rfidReader.uid.size; i++) {
-        Serial.print(rfidReader.uid.uidByte[i] < 0x10 ? " 0" : " ");
-        Serial.print(rfidReader.uid.uidByte[i], HEX);
-    }
-    Serial.println();
-
-    rfidReader.PICC_HaltA();
     return true;
 }
 
-void readButtons() {
-    if (digitalRead(BUTTON_A_PIN) == LOW) {
-        digitalWrite(BUTTON_LED_PIN, HIGH);
-        Serial.println("Button A pressed");
+void updateSmoothMovement() {
+    if (!isMoving || millis() - lastMoveTime < MOVE_INTERVAL) {
+        return;
     }
-    if (digitalRead(BUTTON_B_PIN) == LOW) {
-        digitalWrite(BUTTON_LED_PIN, LOW);
-        Serial.println("Button B pressed");
-    }
-}
 
-// ===============================================================================
-// DISPLAY AND OUTPUT FUNCTIONS
-// ===============================================================================
+    lastMoveTime = millis();
+    float stepSize = (float)movementSpeed / 100.0f; // Convert speed to step size
+    bool allReached = true;
 
-void updateLCD() {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Time: ");
-
-    currentTime = rtcClock.getDateTime();
-    lcd.print(currentTime.hour);
-    lcd.print(":");
-    lcd.print(currentTime.minute);
-
-    lcd.setCursor(0, 1);
-    lcd.print("Temp: ");
-
-    float temp, humidity;
-    if (readDHT(&temp, &humidity)) {
-        lcd.print(temp, 1);
-        lcd.print("C");
-    }
-}
-
-void updateShiftRegister() {
-    digitalWrite(SHIFT_LATCH_PIN, LOW);
-    shiftOut(SHIFT_DATA_PIN, SHIFT_CLOCK_PIN, LSBFIRST, shiftRegisterLEDs);
-    digitalWrite(SHIFT_LATCH_PIN, HIGH);
-}
-
-void setShiftRegisterLED(int ledNumber, bool state) {
-    if (ledNumber >= 0 && ledNumber <= 7) {
-        if (state) {
-            bitSet(shiftRegisterLEDs, ledNumber);
+    for (int i = 0; i < NUM_MOTORS; i++) {
+        float diff = targetAngles[i] - currentAngles[i];
+        if (absf(diff) > POSITION_TOLERANCE) {
+            float step = diff * stepSize;
+            currentAngles[i] += step;
+            allReached = false;
         } else {
-            bitClear(shiftRegisterLEDs, ledNumber);
+            currentAngles[i] = targetAngles[i];
         }
-        updateShiftRegister();
+    }
+
+    writeToServos();
+
+    if (allReached) {
+        isMoving = false;
+        Serial.println(F("Movement complete."));
+        printCurrentPosition();
     }
 }
 
-void updateSevenSegment(int digit) {
-    if (digit >= 0 && digit <= 9) {
-        digitalWrite(SEVEN_SEG_LATCH_PIN, LOW);
-        shiftOut(SEVEN_SEG_DATA_PIN, SEVEN_SEG_CLOCK_PIN, LSBFIRST, sevenSegDigits[digit]);
-        digitalWrite(SEVEN_SEG_LATCH_PIN, HIGH);
-    }
-}
+void moveToAngles(float a1, float a2, bool smooth = true) {
+    targetAngles[0] = clampf(a1, LEFTEND, RIGHTEND);
+    targetAngles[1] = clampf(a2, LEFTEND, RIGHTEND);
 
-void displayLEDMatrix() {
-    // Display "Arduino" text pattern
-    byte a[5] = {B01111110, B10001000, B10001000, B10001000, B01111110};
-
-    for (int i = 0; i < 5; i++) {
-        ledMatrix.setRow(0, i, a[i]);
-    }
-    delay(1000);
-    ledMatrix.clearDisplay(0);
-}
-
-// ===============================================================================
-// MOTOR AND ACTUATOR CONTROL FUNCTIONS
-// ===============================================================================
-
-void controlMotor(int speed, bool direction) {
-    analogWrite(MOTOR_ENABLE_PIN, abs(speed));
-
-    if (direction) {
-        digitalWrite(MOTOR_DIR_A_PIN, HIGH);
-        digitalWrite(MOTOR_DIR_B_PIN, LOW);
+    if (!smooth) {
+        currentAngles[0] = targetAngles[0];
+        currentAngles[1] = targetAngles[1];
+        writeToServos();
+        printCurrentPosition();
     } else {
-        digitalWrite(MOTOR_DIR_A_PIN, LOW);
-        digitalWrite(MOTOR_DIR_B_PIN, HIGH);
+        isMoving = true;
+        lastMoveTime = millis();
     }
 }
 
-void stopMotor() {
-    digitalWrite(MOTOR_ENABLE_PIN, LOW);
-}
-
-void controlStepper(int steps) {
-    stepperMotor.step(steps);
-    // Turn off motor coils to save power
-    digitalWrite(STEPPER_PIN1, LOW);
-    digitalWrite(STEPPER_PIN2, LOW);
-    digitalWrite(STEPPER_PIN3, LOW);
-    digitalWrite(STEPPER_PIN4, LOW);
-}
-
-void controlServo(int angle) {
-    if (angle >= 0 && angle <= 180) {
-        servoMotor.write(angle);
+void writeToServos() {
+    for (int i = 0; i < NUM_MOTORS; i++) {
+        long pulse = map((long)(currentAngles[i] * 100), LEFTEND * 100, RIGHTEND * 100, SERVOMIN[i],
+                         SERVOMAX[i]);
+        pulse = clampf(pulse, SERVOMIN[i], SERVOMAX[i]);
+        pwmValues[i] = pulse;
+        pwm.setPWM(i, 0, (int)pulse);
     }
 }
 
-void sweepServo() {
-    for (int angle = 0; angle <= 180; angle++) {
-        servoMotor.write(angle);
-        delay(10);
+// ---------- Kinematics ----------
+bool inverseKinematics(float x, float y, int elbow, float &theta1_deg, float &theta2_deg) {
+    float r = sqrtf(x * x + y * y);
+    float reachMin = absf(L1 - RSEG);
+    float reachMax = L1 + RSEG;
+    bool reachable = (r >= reachMin && r <= reachMax && r > 0.001f);
+
+    // Avoid division by zero and numerical issues
+    if (r < 0.001f) {
+        theta1_deg = 0.0f;
+        theta2_deg = 0.0f;
+        return false;
     }
-    for (int angle = 180; angle >= 0; angle--) {
-        servoMotor.write(angle);
-        delay(10);
-    }
+
+    // cos(theta2)
+    float c2 = (x * x + y * y - L1 * L1 - RSEG * RSEG) / (2.0f * L1 * RSEG);
+    c2 = clampf(c2, -1.0f, 1.0f);
+
+    // choose elbow by signed sin(theta2)
+    float s2 = elbow * sqrtf(fmaxf(0.0f, 1.0f - c2 * c2));
+    float theta2 = atan2f(s2, c2);
+
+    // theta1 via two-atan2 terms
+    float k1 = L1 + RSEG * c2;
+    float k2 = RSEG * s2;
+    float theta1 = atan2f(y, x) - atan2f(k2, k1);
+
+    theta1_deg = rad2deg(theta1);
+    theta2_deg = rad2deg(theta2);
+
+    return reachable;
 }
 
-// ===============================================================================
-// RGB LED CONTROL FUNCTIONS
-// ===============================================================================
+void forwardKinematics(float a1, float a2, float &x, float &y) {
+    float theta1 = THETA_ZERO[0] + SGN[0] * a1;
+    float theta2 = THETA_ZERO[1] + SGN[1] * a2;
 
-void setRGBColor(int red, int green, int blue) {
-    analogWrite(RGB_RED_PIN, red);
-    analogWrite(RGB_GREEN_PIN, green);
-    analogWrite(RGB_BLUE_PIN, blue);
+    float t1 = deg2rad(theta1);
+    float t12 = deg2rad(theta1 + theta2);
+
+    x = L1 * cosf(t1) + RSEG * cosf(t12);
+    y = L1 * sinf(t1) + RSEG * sinf(t12);
 }
 
-void controlRGB() {
-    // Color cycling animation
-    for (int i = 0; i < 255; i++) {
-        setRGBColor(255 - i, i, 0); // Red to Green
-        delay(10);
-    }
-    for (int i = 0; i < 255; i++) {
-        setRGBColor(0, 255 - i, i); // Green to Blue
-        delay(10);
-    }
-    for (int i = 0; i < 255; i++) {
-        setRGBColor(i, 0, 255 - i); // Blue to Red
-        delay(10);
-    }
+// ---------- Display Functions ----------
+void printHelp() {
+    Serial.println(F("\n=== EDMO Enhanced IK/FK Controller ==="));
+#if (EDMO_GEN == 1)
+    Serial.println(F("EDMO gen: 1   L1=5.40  L2=10.40  L3=5.00 [cm]"));
+#else
+    Serial.println(F("EDMO gen: 2   L1=6.65  L2=13.30  L3=6.65 [cm]"));
+#endif
+    Serial.println(F("\nCommands:"));
+    Serial.println(F("  ANG a1,a2     (or a1,a2)  -> servo angles (deg)"));
+    Serial.println(F("  IK x y [U|D]  -> go to (x,y) cm; U=elbow-up, D=elbow-down"));
+    Serial.println(F("  HOME          -> move to home position (0,0)"));
+    Serial.println(F("  STATUS        -> show current position and servo info"));
+    Serial.println(F("  LIMITS        -> show workspace limits"));
+    Serial.println(F("  SMOOTH n      -> set movement speed (1-10, 5=default)"));
+    Serial.println(F("  HELP          -> show this help"));
+
+    float reachMin = absf(L1 - RSEG);
+    float reachMax = L1 + RSEG;
+    Serial.print(F("\nWorkspace: "));
+    Serial.print(reachMin, 2);
+    Serial.print(F(" to "));
+    Serial.print(reachMax, 2);
+    Serial.println(F(" cm radius"));
+    Serial.println(F("Servo range: -90° to +90°\n"));
 }
 
-// ===============================================================================
-// SOUND FUNCTIONS
-// ===============================================================================
+void printCurrentPosition() {
+    float x, y;
+    forwardKinematics(currentAngles[0], currentAngles[1], x, y);
 
-void playBuzzer(int duration) {
-    digitalWrite(BUZZER_PIN, HIGH);
-    delay(duration);
-    digitalWrite(BUZZER_PIN, LOW);
+    float theta1 = THETA_ZERO[0] + SGN[0] * currentAngles[0];
+    float theta2 = THETA_ZERO[1] + SGN[1] * currentAngles[1];
+
+    // CSV format: a1,a2,pwm1,pwm2,θ1,θ2,x_cm,y_cm
+    Serial.print(currentAngles[0], 3);
+    Serial.print(',');
+    Serial.print(currentAngles[1], 3);
+    Serial.print(',');
+    Serial.print(pwmValues[0]);
+    Serial.print(',');
+    Serial.print(pwmValues[1]);
+    Serial.print(',');
+    Serial.print(theta1, 3);
+    Serial.print(',');
+    Serial.print(theta2, 3);
+    Serial.print(',');
+    Serial.print(x, 3);
+    Serial.print(',');
+    Serial.println(y, 3);
+
+    Serial.print(F("Position: α1="));
+    Serial.print(currentAngles[0], 2);
+    Serial.print(F("°, α2="));
+    Serial.print(currentAngles[1], 2);
+    Serial.print(F("° | θ1="));
+    Serial.print(theta1, 2);
+    Serial.print(F("°, θ2="));
+    Serial.print(theta2, 2);
+    Serial.print(F("° | End: ("));
+    Serial.print(x, 2);
+    Serial.print(F(", "));
+    Serial.print(y, 2);
+    Serial.println(F(") cm"));
 }
 
-void playMelody() {
-    int melody[] = {262, 294, 330, 349, 392, 440, 494, 523}; // C major scale
-    int duration = 500;
+void printStatus() {
+    Serial.println(F("=== SYSTEM STATUS ==="));
+    printCurrentPosition();
+    Serial.print(F("Movement speed: "));
+    Serial.println(movementSpeed);
+    Serial.print(F("Is moving: "));
+    Serial.println(isMoving ? F("YES") : F("NO"));
+    Serial.print(F("Error count: "));
+    Serial.println(errorCount);
 
-    for (int i = 0; i < 8; i++) {
-        tone(PASSIVE_BUZZER_PIN, melody[i], duration);
-        delay(600);
+    float reachMin = absf(L1 - RSEG);
+    float reachMax = L1 + RSEG;
+    float x, y;
+    forwardKinematics(currentAngles[0], currentAngles[1], x, y);
+    float currentReach = sqrtf(x * x + y * y);
+
+    Serial.print(F("Current reach: "));
+    Serial.print(currentReach, 2);
+    Serial.print(F(" cm ("));
+    Serial.print((currentReach / reachMax) * 100.0f, 1);
+    Serial.println(F("% of max)"));
+}
+
+void printLimits() {
+    float reachMin = absf(L1 - RSEG);
+    float reachMax = L1 + RSEG;
+
+    Serial.println(F("=== WORKSPACE LIMITS ==="));
+    Serial.print(F("Min reach: "));
+    Serial.print(reachMin, 2);
+    Serial.println(F(" cm"));
+    Serial.print(F("Max reach: "));
+    Serial.print(reachMax, 2);
+    Serial.println(F(" cm"));
+    Serial.print(F("Servo angles: "));
+    Serial.print(LEFTEND);
+    Serial.print(F("° to "));
+    Serial.print(RIGHTEND);
+    Serial.println(F("°"));
+    Serial.print(F("PWM ranges: CH0["));
+    Serial.print(SERVOMIN[0]);
+    Serial.print(F("-"));
+    Serial.print(SERVOMAX[0]);
+    Serial.print(F("], CH1["));
+    Serial.print(SERVOMIN[1]);
+    Serial.print(F("-"));
+    Serial.print(SERVOMAX[1]);
+    Serial.println(F("]"));
+}
+
+// ---------- Command Parsing ----------
+void logError(const char *msg) {
+    errorCount++;
+    lastErrorTime = millis();
+    Serial.print(F("ERROR: "));
+    Serial.println(msg);
+}
+
+bool startsWithIgnoreCase(const char *s, const char *pre) {
+    while (*pre) {
+        if (toupper((unsigned char)*s++) != toupper((unsigned char)*pre++))
+            return false;
     }
+    return true;
 }
 
-void playAlarm() {
-    for (int i = 0; i < 10; i++) {
-        digitalWrite(BUZZER_PIN, HIGH);
-        delay(100);
-        digitalWrite(BUZZER_PIN, LOW);
-        delay(100);
-    }
+void replaceChar(char *s, char from, char to) {
+    for (; *s; ++s)
+        if (*s == from)
+            *s = to;
 }
 
-// ===============================================================================
-// UTILITY FUNCTIONS
-// ===============================================================================
+void handleAngles(char *s) {
+    replaceChar(s, ',', ' ');
+    char *tok = strtok(s, " \t");
+    float a1 = 0, a2 = 0;
+    int cnt = 0;
 
-void decodeIRButton(uint32_t code) {
-    switch (code) {
-    case 0xBA45FF00:
-        Serial.println("POWER");
-        break;
-    case 0xB847FF00:
-        Serial.println("FUNC/STOP");
-        break;
-    case 0xB946FF00:
-        Serial.println("VOL+");
-        break;
-    case 0xBB44FF00:
-        Serial.println("FAST BACK");
-        break;
-    case 0xBF40FF00:
-        Serial.println("PAUSE");
-        break;
-    case 0xBC43FF00:
-        Serial.println("FAST FORWARD");
-        break;
-    case 0xF807FF00:
-        Serial.println("DOWN");
-        break;
-    case 0xEA15FF00:
-        Serial.println("VOL-");
-        break;
-    case 0xF609FF00:
-        Serial.println("UP");
-        break;
-    case 0xE619FF00:
-        Serial.println("EQ");
-        break;
-    case 0xF20DFF00:
-        Serial.println("ST/REPT");
-        break;
-    case 0xE916FF00:
-        Serial.println("0");
-        break;
-    case 0xF30CFF00:
-        Serial.println("1");
-        break;
-    case 0xE718FF00:
-        Serial.println("2");
-        break;
-    case 0xA15EFF00:
-        Serial.println("3");
-        break;
-    case 0xF708FF00:
-        Serial.println("4");
-        break;
-    case 0xE31CFF00:
-        Serial.println("5");
-        break;
-    case 0xA55AFF00:
-        Serial.println("6");
-        break;
-    case 0xBD42FF00:
-        Serial.println("7");
-        break;
-    case 0xAD52FF00:
-        Serial.println("8");
-        break;
-    case 0xB54AFF00:
-        Serial.println("9");
-        break;
-    default:
-        Serial.println("Unknown button");
-        break;
-    }
-}
-
-void printTime() {
-    currentTime = rtcClock.getDateTime();
-    Serial.print("Current time: ");
-    Serial.print(currentTime.year);
-    Serial.print("-");
-    Serial.print(currentTime.month);
-    Serial.print("-");
-    Serial.print(currentTime.day);
-    Serial.print(" ");
-    Serial.print(currentTime.hour);
-    Serial.print(":");
-    Serial.print(currentTime.minute);
-    Serial.print(":");
-    Serial.println(currentTime.second);
-}
-
-void lightMeter() {
-    int lightLevel = readPhotoresistor();
-    int numLEDs = lightLevel / 128; // Scale to 0-8 LEDs
-
-    shiftRegisterLEDs = 0;
-    for (int i = 0; i < numLEDs; i++) {
-        bitSet(shiftRegisterLEDs, i);
-    }
-    updateShiftRegister();
-}
-
-// ===============================================================================
-// ADVANCED CONTROL FUNCTIONS
-// ===============================================================================
-
-void demoMode() {
-    Serial.println("Starting Demo Mode...");
-
-    // RGB LED demo
-    Serial.println("RGB LED Demo");
-    controlRGB();
-
-    // Servo sweep demo
-    Serial.println("Servo Demo");
-    sweepServo();
-
-    // Buzzer demo
-    Serial.println("Buzzer Demo");
-    playMelody();
-
-    // LED Matrix demo
-    Serial.println("LED Matrix Demo");
-    displayLEDMatrix();
-
-    // Seven segment counter
-    Serial.println("Seven Segment Counter");
-    for (int i = 0; i < 10; i++) {
-        updateSevenSegment(i);
-        delay(500);
-    }
-
-    Serial.println("Demo complete!");
-}
-
-void automaticLighting() {
-    int lightLevel = analogRead(PHOTO_PIN);
-
-    if (lightLevel < 300) {
-        // Dark - turn on LED
-        setShiftRegisterLED(0, true);
-        setRGBColor(255, 255, 255); // White light
-    } else {
-        // Bright - turn off LED
-        setShiftRegisterLED(0, false);
-        setRGBColor(0, 0, 0);
-    }
-}
-
-void securitySystem() {
-    static bool armed = false;
-    static unsigned long lastMotion = 0;
-
-    // Check for arming/disarming via keypad
-    char key = readKeypad();
-    if (key == 'A') {
-        armed = !armed;
-        Serial.print("Security system ");
-        Serial.println(armed ? "ARMED" : "DISARMED");
-        playBuzzer(100);
-    }
-
-    if (armed) {
-        if (readPIR()) {
-            if (millis() - lastMotion > 5000) { // 5 second cooldown
-                Serial.println("SECURITY ALERT: Motion detected!");
-                playAlarm();
-                setRGBColor(255, 0, 0); // Red alert
-                lastMotion = millis();
+    while (tok && cnt < 2) {
+        if (*tok) {
+            float val = atof(tok);
+            if (val < LEFTEND - 10 || val > RIGHTEND + 10) {
+                logError("Angle out of reasonable range");
+                return;
             }
+            if (cnt == 0)
+                a1 = val;
+            else
+                a2 = val;
+            cnt++;
         }
+        tok = strtok(NULL, " \t");
+    }
+
+    if (cnt != 2) {
+        logError("Need two angles. Example: 15,-20 or ANG 15,-20");
+        return;
+    }
+
+    moveToAngles(a1, a2);
+}
+
+void handleIK(char *s) {
+    s += 2; // skip "IK"
+    replaceChar(s, ',', ' ');
+    char *tok = strtok(s, " \t");
+    float x = NAN, y = NAN;
+    int elbow = -1; // default elbow-down
+    int idx = 0;
+
+    while (tok) {
+        if (*tok == '\0') {
+            tok = strtok(NULL, " \t");
+            continue;
+        }
+        if (idx == 0)
+            x = atof(tok);
+        else if (idx == 1)
+            y = atof(tok);
+        else if (idx == 2) {
+            char c = toupper(*tok);
+            if (c == 'U')
+                elbow = +1;
+            else if (c == 'D')
+                elbow = -1;
+            else
+                elbow = (atoi(tok) >= 0) ? +1 : -1;
+        }
+        idx++;
+        tok = strtok(NULL, " \t");
+    }
+
+    if (isnan(x) || isnan(y)) {
+        logError("IK needs x y [U|D]. Example: IK 12.3 18.0 U");
+        return;
+    }
+
+    float reachMax = L1 + RSEG;
+    float targetReach = sqrtf(x * x + y * y);
+    if (targetReach > reachMax + 0.5f) {
+        Serial.print(F("WARNING: Target ("));
+        Serial.print(x, 2);
+        Serial.print(F(", "));
+        Serial.print(y, 2);
+        Serial.print(F(") is "));
+        Serial.print(targetReach, 2);
+        Serial.print(F(" cm, exceeds max reach "));
+        Serial.print(reachMax, 2);
+        Serial.println(F(" cm"));
+    }
+
+    float th1, th2;
+    bool reachable = inverseKinematics(x, y, elbow, th1, th2);
+
+    float a1 = (th1 - THETA_ZERO[0]) / (float)SGN[0];
+    float a2 = (th2 - THETA_ZERO[1]) / (float)SGN[1];
+
+    Serial.print(F("IK: ("));
+    Serial.print(x, 2);
+    Serial.print(F(", "));
+    Serial.print(y, 2);
+    Serial.print(F(") cm, elbow "));
+    Serial.print(elbow > 0 ? F("UP") : F("DOWN"));
+    Serial.print(F(" -> θ1="));
+    Serial.print(th1, 2);
+    Serial.print(F("°, θ2="));
+    Serial.print(th2, 2);
+    Serial.print(F("° | Reachable: "));
+    Serial.println(reachable ? F("YES") : F("NO (clamped)"));
+
+    moveToAngles(a1, a2);
+}
+
+void handleCommand(char *line) {
+    // Trim leading spaces
+    while (*line == ' ' || *line == '\t')
+        line++;
+
+    if (strlen(line) == 0)
+        return;
+
+    if (startsWithIgnoreCase(line, "HELP")) {
+        printHelp();
+    } else if (startsWithIgnoreCase(line, "STATUS")) {
+        printStatus();
+    } else if (startsWithIgnoreCase(line, "LIMITS")) {
+        printLimits();
+    } else if (startsWithIgnoreCase(line, "HOME")) {
+        Serial.println(F("Moving to home position..."));
+        moveToAngles(0, 0);
+    } else if (startsWithIgnoreCase(line, "SMOOTH")) {
+        char *p = line + 6;
+        while (*p == ' ' || *p == '\t')
+            p++;
+        int speed = atoi(p);
+        if (speed >= 1 && speed <= MAX_SPEED) {
+            movementSpeed = speed;
+            Serial.print(F("Movement speed set to "));
+            Serial.println(speed);
+        } else {
+            logError("Speed must be 1-10");
+        }
+    } else if (startsWithIgnoreCase(line, "IK")) {
+        handleIK(line);
+    } else if (startsWithIgnoreCase(line, "ANG")) {
+        char *p = line + 3;
+        handleAngles(p);
+    } else {
+        // Try to parse as direct angles
+        handleAngles(line);
     }
 }
 
-// ===============================================================================
-// END OF LIBRARY
-// ===============================================================================
+// ---------- Arduino Setup & Loop ----------
+void setup() {
+    Serial.begin(9600);
+    pwm.begin();
+    pwm.setPWMFreq(50);
+    delay(100);
 
-/*
- * USAGE EXAMPLES:
- *
- * In loop(), you can call any of these functions:
- *
- * // Read sensors
- * long distance = readUltrasonic();
- * char key = readKeypad();
- * float temp, humidity;
- * bool dhtSuccess = readDHT(&temp, &humidity);
- *
- * // Control outputs
- * setRGBColor(255, 0, 0);  // Red
- * controlServo(90);         // 90 degrees
- * playBuzzer(500);         // 500ms beep
- * updateSevenSegment(5);   // Display "5"
- *
- * // Run demos
- * demoMode();              // Full demonstration
- * automaticLighting();     // Light-sensitive LED
- * securitySystem();        // Motion-activated alarm
- *
- * REQUIRED ADDITIONAL FILES:
- * - pitches.h (for musical notes)
- * - All the required libraries installed in Arduino IDE
- *
- * WIRING:
- * Follow the pin definitions at the top of this file.
- * Adjust pins as needed for your specific setup.
- */
+    // Initialize to home position
+    moveToAngles(0, 0, false);
+
+    while (!Serial) {
+        delay(10);
+    }
+
+    Serial.println(F("EDMO Enhanced Controller Ready!"));
+    printHelp();
+    Serial.println(F("Type STATUS to see current position."));
+}
+
+void loop() {
+    // Handle smooth movement
+    updateSmoothMovement();
+
+    // Process serial input
+    while (Serial.available()) {
+        char c = Serial.read();
+        if (c != '\n' && c != '\r') {
+            if (bufferIndex < sizeof(inputBuffer) - 1) {
+                inputBuffer[bufferIndex++] = c;
+            }
+        } else if (bufferIndex > 0) {
+            inputBuffer[bufferIndex] = '\0';
+            bufferIndex = 0;
+            handleCommand(inputBuffer);
+        }
+    }
+
+    // Small delay to prevent overwhelming the serial
+    delay(1);
+}
