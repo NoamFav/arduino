@@ -7,6 +7,7 @@
 PIDController pid_controller;
 PerformanceMetrics metrics;
 float target_position = 512.0f;
+bool telemetry_enabled = true;
 
 void setup() {
     pinMode(MOTOR_PWM_PIN, OUTPUT);
@@ -32,7 +33,8 @@ void loop() {
         float out = executePIDStep(pid_controller, err);
         setMotorOutput(out);
         updatePerformanceMetrics(metrics, err);
-        // sendStatusUpdate(pos, err, out, pid_controller, target_position);
+        if (telemetry_enabled)
+            sendStatusUpdate(pos, err, out, pid_controller, target_position);
     }
     processSerialInput();
 }

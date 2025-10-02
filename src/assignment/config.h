@@ -13,7 +13,7 @@ static const int MOTOR_OUTPUT_MAX = 255;
 static const int MIN_PWM_KICK = 10;
 static const int MOTOR_DEADBAND = 2;
 static const float INTEGRAL_DEADBAND = 2.0f;
-static const float SMOOTHING_ALPHA = 0.20f;
+static const float SMOOTHING_ALPHA = 0.9f;
 
 static const float POT_RAW_MIN = 200.0f;
 static const float POT_RAW_MAX = 800.0f;
@@ -25,7 +25,7 @@ enum OutputFormat : uint8_t {
     OUTPUT_MODE_JSON = 2
 };
 
-static const uint8_t OUTPUT_FORMAT = OUTPUT_MODE_PLOTTER;
+static const uint8_t OUTPUT_FORMAT = 0;
 
 struct PerformanceMetrics {
     uint32_t loop_count = 0, last_report_time = 0;

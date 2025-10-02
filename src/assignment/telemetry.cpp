@@ -8,6 +8,11 @@ void sendStatusUpdate(float pos, float err, float out, const PIDController &pid,
     n++;
     switch (OUTPUT_FORMAT) {
     case OUTPUT_MODE_PLOTTER:
+        static bool header = false;
+        if (!header) {
+            Serial.println("ms,target,pos,out");
+            header = true;
+        }
         Serial.print(target, 2);
         Serial.print(',');
         Serial.print(pos, 2);
