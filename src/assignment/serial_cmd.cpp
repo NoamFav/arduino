@@ -140,6 +140,16 @@ void processSerialCommand(const char *in) {
         Serial.println(target_position, 1);
         return;
     }
+    if (!strcmp(cmd, "tele=1")) {
+        telemetry_enabled = true;
+        Serial.println("ACK tele=1");
+        return;
+    }
+    if (!strcmp(cmd, "tele=0")) {
+        telemetry_enabled = false;
+        Serial.println("ACK tele=0");
+        return;
+    }
     Serial.println("Unknown command. Type 'help'.");
 }
 
