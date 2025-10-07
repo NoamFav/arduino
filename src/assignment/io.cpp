@@ -32,5 +32,5 @@ void setMotorOutput(float output) {
         pwm = MIN_PWM_KICK;
     pwm = constrain(pwm, 0, 255);
     digitalWrite(MOTOR_DIR_PIN, forward ? HIGH : LOW);
-    analogWrite(MOTOR_PWM_PIN, pwm); // SAMD21 PWM is 8-bit by default → 0..255
+    analogWrite(MOTOR_PWM_PIN, pwm);
 }
