@@ -33,7 +33,7 @@ double gait_stride_deg = 18.0;
 double gait_bias_deg = 0.0;
 double gait_turn_rad = 0.0;
 
-// define the function
+// Tried to make it walk and turn — didn't work; too few segments to rotate effectively
 void applyWalkGait() {
     const double pb = PI + gait_turn_rad;
     osc[0].phaseBias[1] = pb;

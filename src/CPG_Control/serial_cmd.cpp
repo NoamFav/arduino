@@ -212,7 +212,8 @@ static void processSerialCommand(const char *in) {
         return;
     }
 
-    // stride <deg>
+    // stride <deg> Not fully functional as the turn function, attempt to make the CPG motor to move
+    // sideway.
     if (n == 2 && !strcmp(tok[0], "stride")) {
         gait_stride_deg = constrain(atof(tok[1]), 0.0, 45.0);
         applyWalkGait();
@@ -220,7 +221,7 @@ static void processSerialCommand(const char *in) {
         return;
     }
 
-    // speed <hz>
+    // speed <hz> Work with walk pretty normally.
     if (n == 2 && !strcmp(tok[0], "speed")) {
         double f = atof(tok[1]);
         gait_speed_hz = (f < 0.0) ? 0.0 : f;
@@ -229,7 +230,7 @@ static void processSerialCommand(const char *in) {
         return;
     }
 
-    // bias <deg>
+    // bias <deg> Work with walk function, normally working. Need more testing.
     if (n == 2 && !strcmp(tok[0], "bias")) {
         gait_bias_deg = constrain(atof(tok[1]), -15.0, 15.0);
         applyWalkGait();
@@ -237,7 +238,7 @@ static void processSerialCommand(const char *in) {
         return;
     }
 
-    // turn <rad>
+    // turn <rad> Attempt at rotation on a CPG motor, unsuccesful as of now.
     if (n == 2 && !strcmp(tok[0], "turn")) {
         gait_turn_rad = constrain(atof(tok[1]), -0.5, 0.5);
         applyWalkGait();
@@ -245,7 +246,7 @@ static void processSerialCommand(const char *in) {
         return;
     }
 
-    // walk (preset): anti-phase, default stride/speed
+    // Will can't really turn, it should work with correct values
     if (!strcmp(tok[0], "walk")) {
         applyWalkGait();
         Serial.println(F("OK walk"));
