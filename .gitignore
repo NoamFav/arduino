@@ -5,5 +5,4 @@
 *.d
 build/
 
-.DS_Store
 code/
